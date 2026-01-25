@@ -1,14 +1,37 @@
-import { Home, User, Settings, Pill } from "lucide-react";
+import { Home, User, Settings, Pill, LogOut } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Sidebar = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
   const navItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
     { icon: User, label: "Meu Perfil", path: "/profile" },
     { icon: Settings, label: "Configurações", path: "/settings" },
   ];
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, child_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setProfile(data);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -57,8 +80,12 @@ const Sidebar = () => {
             <User className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-sidebar-foreground">Maria Silva</p>
-            <p className="text-xs text-muted-foreground">Mãe de Lucas</p>
+            <p className="text-sm font-semibold text-sidebar-foreground">
+              {profile?.full_name || "Usuário"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {profile?.child_name ? `Mãe de ${profile.child_name}` : "AlerGica"}
+            </p>
           </div>
         </div>
       </div>

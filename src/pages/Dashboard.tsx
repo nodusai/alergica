@@ -1,6 +1,11 @@
-import { Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { Search, LogOut } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
+import OnboardingModal from "@/components/OnboardingModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const mockMedications = [
   {
@@ -48,8 +53,74 @@ const mockMedications = [
 ];
 
 const Dashboard = () => {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userName, setUserName] = useState("Mamãe");
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/");
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (!user) return;
+      
+      // Check if user has completed onboarding
+      const { data } = await supabase
+        .from("user_onboarding")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (!data) {
+        setShowOnboarding(true);
+      }
+
+      // Get user name from profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (profile?.full_name) {
+        setUserName(profile.full_name.split(" ")[0]);
+      }
+    };
+
+    if (user) {
+      checkOnboarding();
+    }
+  }, [user]);
+
+  const handleOnboardingComplete = async () => {
+    if (user) {
+      await supabase.from("user_onboarding").insert({ user_id: user.id });
+    }
+    setShowOnboarding(false);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-primary">Carregando...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Onboarding Modal */}
+      <OnboardingModal open={showOnboarding} onComplete={handleOnboardingComplete} />
+
       {/* Sidebar */}
       <Sidebar />
 
@@ -58,9 +129,18 @@ const Dashboard = () => {
         <div className="max-w-5xl mx-auto">
           {/* Header with Search */}
           <div className="mb-10 animate-fade-in">
-            <h2 className="text-2xl font-bold text-foreground mb-6">
-              Olá, Maria! 👋
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-foreground">
+                Olá, {userName}! 👋
+              </h2>
+              <button 
+                onClick={handleSignOut}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="text-sm font-medium">Sair</span>
+              </button>
+            </div>
             
             {/* Search Bar */}
             <div className="relative">
@@ -82,7 +162,8 @@ const Dashboard = () => {
             {/* Medication Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {mockMedications.map((med, index) => (
-                <div 
+                <Link 
+                  to="/medication/1"
                   key={med.id} 
                   style={{ animationDelay: `${0.1 + index * 0.05}s` }}
                 >
@@ -92,7 +173,7 @@ const Dashboard = () => {
                     riskLevel={med.riskLevel}
                     riskText={med.riskText}
                   />
-                </div>
+                </Link>
               ))}
             </div>
           </section>
