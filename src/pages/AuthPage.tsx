@@ -135,41 +135,41 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row overflow-hidden">
       {/* Left Half - Welcome Section */}
       <div 
-        className={`gradient-welcome flex-col items-center justify-center p-12 transition-all duration-1000 ease-out ${
-          isAnimated ? 'w-full lg:w-1/2' : 'w-full'
+        className={`gradient-welcome flex-col items-center justify-center p-6 md:p-12 transition-all duration-1000 ease-out ${
+          isAnimated ? 'min-h-[40vh] lg:min-h-screen lg:w-1/2' : 'min-h-screen w-full'
         } flex`}
       >
         <div className="max-w-md text-center animate-fade-in">
           {/* Logo */}
-          <h1 className="text-4xl font-extrabold text-primary-foreground mb-8">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-primary-foreground mb-4 md:mb-8">
             Aler<span className="text-primary">Gica</span>
           </h1>
           
           {/* Mascot */}
-          <div className="relative mb-8">
+          <div className="relative mb-4 md:mb-8">
             <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-110" />
             <img 
               src={mascotImage} 
               alt="AlerGica mascot - uma simpática ursa enfermeira" 
-              className="relative w-72 h-72 object-contain mx-auto animate-float"
+              className="relative w-40 h-40 md:w-72 md:h-72 object-contain mx-auto animate-float"
             />
           </div>
           
-          {/* Tagline */}
-          <div className="text-center">
-            <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+          {/* Tagline - Hidden on mobile when animated */}
+          <div className={`text-center transition-opacity duration-500 ${isAnimated ? 'hidden lg:block' : 'block'}`}>
+            <p className="text-lg md:text-xl font-medium text-foreground/80 leading-relaxed">
               Eu sou o <span className="text-primary font-bold">AlerGica</span>,
             </p>
-            <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+            <p className="text-lg md:text-xl font-medium text-foreground/80 leading-relaxed">
               seu ajudante para cuidar do seu bem-estar.
             </p>
-            <p className="text-muted-foreground mt-3 leading-relaxed">
+            <p className="text-sm md:text-base text-muted-foreground mt-3 leading-relaxed">
               Aqui você vai consultar alimentos e remédios para evitar <span className="text-primary font-semibold">sustos</span> e ficar <span className="text-primary font-semibold">seguro</span>.
             </p>
-            <p className="text-muted-foreground leading-relaxed">
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
               Vamos lá?
             </p>
             <p className="text-2xl mt-2">😊</p>
@@ -180,8 +180,8 @@ const AuthPage = () => {
       {/* Right Half - Auth Forms */}
       <div 
         className={`flex items-center justify-center p-6 lg:p-12 bg-background transition-all duration-1000 ease-out ${
-          isAnimated ? 'w-full lg:w-1/2 opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full'
-        } ${isAnimated ? '' : 'lg:hidden'}`}
+          isAnimated ? 'flex-1 lg:w-1/2 opacity-100 translate-y-0 lg:translate-y-0 lg:translate-x-0' : 'h-0 lg:w-0 opacity-0 translate-y-full lg:translate-y-0 lg:translate-x-full overflow-hidden'
+        }`}
       >
         <div className={`w-full max-w-md transition-all duration-700 delay-500 ${
           isAnimated ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
