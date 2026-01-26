@@ -4,6 +4,7 @@ import { Search, LogOut } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
 import OnboardingModal from "@/components/OnboardingModal";
+import APLVInfoCarousel from "@/components/APLVInfoCarousel";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -153,8 +154,11 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* APLV Info Carousel */}
+          <APLVInfoCarousel />
+
           {/* Results Section */}
-          <section className="animate-fade-in" style={{ animationDelay: "0.1s" }}>
+          <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
             <h3 className="text-lg font-bold text-foreground mb-5">
               Resultados Recentes
             </h3>
