@@ -16,6 +16,7 @@ const AuthPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAnimated, setIsAnimated] = useState(false);
   
   // Form state
   const [email, setEmail] = useState("");
@@ -34,6 +35,14 @@ const AuthPage = () => {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  // Trigger animation after component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsAnimated(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const validateLogin = () => {
     const newErrors: Record<string, string> = {};
@@ -126,9 +135,13 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex overflow-hidden">
       {/* Left Half - Welcome Section */}
-      <div className="hidden lg:flex w-1/2 gradient-welcome flex-col items-center justify-center p-12">
+      <div 
+        className={`gradient-welcome flex-col items-center justify-center p-12 transition-all duration-1000 ease-out ${
+          isAnimated ? 'w-full lg:w-1/2' : 'w-full'
+        } flex`}
+      >
         <div className="max-w-md text-center animate-fade-in">
           {/* Logo */}
           <h1 className="text-4xl font-extrabold text-primary-foreground mb-8">
@@ -148,13 +161,13 @@ const AuthPage = () => {
           {/* Tagline */}
           <div className="text-center">
             <p className="text-xl font-medium text-foreground/80 leading-relaxed">
-              Eu sou o AlerGica,
+              Eu sou o <span className="text-primary font-bold">AlerGica</span>,
             </p>
             <p className="text-xl font-medium text-foreground/80 leading-relaxed">
               seu ajudante para cuidar do seu bem-estar.
             </p>
             <p className="text-muted-foreground mt-3 leading-relaxed">
-              Aqui você vai consultar alimentos e remédios para evitar sustos e ficar seguro.
+              Aqui você vai consultar alimentos e remédios para evitar <span className="text-primary font-semibold">sustos</span> e ficar <span className="text-primary font-semibold">seguro</span>.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               Vamos lá?
@@ -165,8 +178,14 @@ const AuthPage = () => {
       </div>
 
       {/* Right Half - Auth Forms */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 bg-background">
-        <div className="w-full max-w-md animate-slide-in-right">
+      <div 
+        className={`flex items-center justify-center p-6 lg:p-12 bg-background transition-all duration-1000 ease-out ${
+          isAnimated ? 'w-full lg:w-1/2 opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full'
+        } ${isAnimated ? '' : 'lg:hidden'}`}
+      >
+        <div className={`w-full max-w-md transition-all duration-700 delay-500 ${
+          isAnimated ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}>
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-3xl font-extrabold text-foreground">
