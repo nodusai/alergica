@@ -126,7 +126,7 @@ const Dashboard = () => {
       <Sidebar />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 pt-16 md:pt-8">
+      <main className="flex-1 ml-64 p-8">
         <div className="max-w-5xl mx-auto">
           {/* Header with Search */}
           <div className="mb-10 animate-fade-in">
