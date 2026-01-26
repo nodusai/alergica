@@ -146,12 +146,21 @@ const AuthPage = () => {
           </div>
           
           {/* Tagline */}
-          <p className="text-xl font-medium text-foreground/80 leading-relaxed">
-            Seu guia seguro para medicamentos e APLV.
-          </p>
-          <p className="text-muted-foreground mt-3">
-            Cuide com confiança. Consulte com tranquilidade.
-          </p>
+          <div className="text-center">
+            <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+              Eu sou o AlerGica,
+            </p>
+            <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+              seu ajudante para cuidar do seu bem-estar.
+            </p>
+            <p className="text-muted-foreground mt-3 leading-relaxed">
+              Aqui você vai consultar alimentos e remédios para evitar sustos e ficar seguro.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Vamos lá?
+            </p>
+            <p className="text-2xl mt-2">😊</p>
+          </div>
         </div>
       </div>
 
