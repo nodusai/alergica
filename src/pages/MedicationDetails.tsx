@@ -2,7 +2,7 @@ import { AlertTriangle, FileText, Pill, ExternalLink, Menu } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import ChatWidget from "@/components/ChatWidget";
-import { Drawer, DrawerContent } from "@/components/ui/Drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { useState } from "react";
 
 // Mock ingredient data
