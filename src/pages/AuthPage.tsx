@@ -4,6 +4,7 @@ import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import mascotImage from "@/assets/mascot.png";
 
 // Validation schemas
@@ -17,6 +18,8 @@ const AuthPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isAnimated, setIsAnimated] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [welcomeFading, setWelcomeFading] = useState(false);
   
   // Form state
   const [email, setEmail] = useState("");
@@ -43,6 +46,17 @@ const AuthPage = () => {
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Mobile welcome animation
+  // Removed automatic timeout, now manual with button
+
+  const handleContinue = () => {
+    setWelcomeFading(true);
+    setTimeout(() => {
+      setShowWelcome(false);
+      setWelcomeFading(false);
+    }, 500); // Match transition duration
+  };
 
   const validateLogin = () => {
     const newErrors: Record<string, string> = {};
@@ -136,11 +150,62 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen flex overflow-hidden">
-      {/* Left Half - Welcome Section */}
+      {/* Mobile Welcome Screen */}
+      {showWelcome && (
+        <div className={`lg:hidden w-full gradient-welcome flex flex-col items-center justify-center p-6 md:p-12 transition-opacity duration-500 ${
+          welcomeFading ? 'opacity-0' : 'opacity-100'
+        }`}>
+          <div className="max-w-md text-center animate-fade-in">
+            {/* Logo */}
+            <h1 className="text-4xl font-extrabold text-primary-foreground mb-8">
+              Aler<span className="text-primary">Gica</span>
+            </h1>
+            
+            {/* Mascot */}
+            <div className="relative mb-8">
+              <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-110" />
+              <img 
+                src={mascotImage} 
+                alt="AlerGica mascot - uma simpática ursa enfermeira" 
+                className="relative w-48 h-48 md:w-72 md:h-72 object-contain mx-auto animate-float"
+              />
+            </div>
+            
+            {/* Tagline */}
+            <div className="text-center">
+              <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+                Eu sou o <span className="text-primary font-bold">AlerGica</span>,
+              </p>
+              <p className="text-xl font-medium text-foreground/80 leading-relaxed">
+                seu ajudante para cuidar do seu bem-estar.
+              </p>
+              <p className="text-muted-foreground mt-3 leading-relaxed">
+                Aqui você vai consultar alimentos e remédios para evitar <span className="text-primary font-semibold">sustos</span> e ficar <span className="text-primary font-semibold">seguro</span>.
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                Vamos lá?
+              </p>
+              <p className="text-2xl mt-2">😊</p>
+              
+              {/* Continue Button */}
+              <div className="mt-8">
+                <Button 
+                  onClick={handleContinue}
+                  className="btn-primary px-8 py-3 text-lg"
+                >
+                  Continuar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Left Half - Welcome Section */}
       <div 
-        className={`gradient-welcome flex-col items-center justify-center p-12 transition-all duration-1000 ease-out ${
-          isAnimated ? 'w-full lg:w-1/2' : 'w-full'
-        } flex`}
+        className={`hidden lg:flex gradient-welcome flex-col items-center justify-center p-6 md:p-12 transition-all duration-1000 ease-out ${
+          isAnimated ? 'w-1/2' : 'w-full'
+        }`}
       >
         <div className="max-w-md text-center animate-fade-in">
           {/* Logo */}
@@ -154,7 +219,7 @@ const AuthPage = () => {
             <img 
               src={mascotImage} 
               alt="AlerGica mascot - uma simpática ursa enfermeira" 
-              className="relative w-72 h-72 object-contain mx-auto animate-float"
+              className="relative w-48 h-48 md:w-72 md:h-72 object-contain mx-auto animate-float"
             />
           </div>
           
@@ -177,9 +242,11 @@ const AuthPage = () => {
         </div>
       </div>
 
-      {/* Right Half - Auth Forms */}
+      {/* Auth Forms - Mobile and Desktop */}
       <div 
-        className={`flex items-center justify-center p-6 lg:p-12 bg-background transition-all duration-1000 ease-out ${
+        className={`flex items-center justify-center p-4 md:p-6 lg:p-12 bg-background transition-all duration-1000 ease-out ${
+          showWelcome ? 'hidden lg:flex' : 'flex'
+        } ${
           isAnimated ? 'w-full lg:w-1/2 opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full'
         } ${isAnimated ? '' : 'lg:hidden'}`}
       >

@@ -81,17 +81,17 @@ const APLVInfoCarousel = () => {
   }, [api]);
 
   return (
-    <section className="mb-10 animate-fade-in" style={{ animationDelay: "0.05s" }}>
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-primary" />
+    <section className="mb-6 md:mb-8 lg:mb-10 animate-fade-in" style={{ animationDelay: "0.05s" }}>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-5 gap-2 md:gap-0">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <BookOpen className="w-3.5 h-3.5 md:w-5 md:h-5 text-primary" />
           </div>
-          <h3 className="text-lg font-bold text-foreground">
+          <h3 className="text-xs md:text-base lg:text-lg font-bold text-foreground">
             Informações sobre APLV
           </h3>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground self-end md:self-auto">
           <span>{current + 1}</span>
           <span>/</span>
           <span>{count}</span>
@@ -106,18 +106,18 @@ const APLVInfoCarousel = () => {
         }}
         className="w-full"
       >
-        <CarouselContent className="-ml-4">
+        <CarouselContent className="-ml-2 md:-ml-4">
           {aplvInfoData.map((item, index) => (
-            <CarouselItem key={index} className="pl-4 md:basis-1/2 lg:basis-1/2">
+            <CarouselItem key={index} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3">
               <Card className="card-soft h-full border-primary/10 bg-gradient-to-br from-card to-secondary/30">
-                <CardContent className="p-6 flex flex-col h-full">
-                  <h4 className="text-lg font-bold text-foreground mb-3 line-clamp-2">
+                <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col h-full">
+                  <h4 className="text-sm md:text-base lg:text-lg font-bold text-foreground mb-2 md:mb-3 line-clamp-2">
                     {item.titulo}
                   </h4>
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-4 flex-1">
+                  <p className="text-muted-foreground text-xs md:text-sm leading-relaxed mb-3 md:mb-4 flex-1">
                     {item.mensagem}
                   </p>
-                  <div className="pt-4 border-t border-border/50">
+                  <div className="pt-3 md:pt-4 border-t border-border/50">
                     <p className="text-xs text-muted-foreground/80 italic">
                       📚 {item.referencia}
                     </p>

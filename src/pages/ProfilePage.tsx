@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Mail, Phone, AlertTriangle, FileText, Search, ShoppingCart, Pill } from "lucide-react";
+import { User, Mail, Phone, AlertTriangle, FileText, Search, ShoppingCart, Pill, Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import BabyManager from "@/components/BabyManager";
 import ChatWidget from "@/components/ChatWidget";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 
 interface ProfileData {
   full_name: string;
@@ -37,6 +38,7 @@ const ProfilePage = () => {
   });
   
   const [saving, setSaving] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Mock stats - in production, these would come from the database
   const stats = {
@@ -126,194 +128,221 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <Sidebar />
+      {/* Sidebar - Desktop */}
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
 
-      <main className="flex-1 ml-64 p-8">
-        <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-foreground">Meu Perfil</h1>
-            <p className="text-muted-foreground mt-2">
-              Gerencie suas informações pessoais e acompanhe suas consultas
-            </p>
-          </div>
+      {/* Mobile Drawer (controlled via state; trigger is a header button) */}
+      <Drawer open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <DrawerContent className="h-[85vh]">
+          <Sidebar isDrawer={true} onClose={() => setSidebarOpen(false)} />
+        </DrawerContent>
+      </Drawer>
 
-          {/* Stats Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
-            <Card className="card-soft bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <Search className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.consultations}</p>
-                    <p className="text-sm text-muted-foreground">Consultas realizadas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="card-soft bg-gradient-to-br from-secondary to-secondary/50 border-secondary">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.medications_purchased}</p>
-                    <p className="text-sm text-muted-foreground">Remédios comprados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="card-soft bg-gradient-to-br from-[hsl(var(--safe)/0.1)] to-[hsl(var(--safe)/0.05)] border-[hsl(var(--safe)/0.3)]">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[hsl(var(--safe)/0.2)] flex items-center justify-center">
-                    <Pill className="w-6 h-6 text-[hsl(var(--safe))]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.safe_medications}</p>
-                    <p className="text-sm text-muted-foreground">Seguros identificados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="card-soft bg-gradient-to-br from-[hsl(var(--risk)/0.1)] to-[hsl(var(--risk)/0.05)] border-[hsl(var(--risk)/0.3)]">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[hsl(var(--risk)/0.2)] flex items-center justify-center">
-                    <AlertTriangle className="w-6 h-6 text-[hsl(var(--risk))]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.risk_medications}</p>
-                    <p className="text-sm text-muted-foreground">Com risco encontrados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Baby Manager */}
-          <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
-            <BabyManager />
-          </div>
-
-          {/* Profile Form */}
-          <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.3s" }}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <User className="w-5 h-5 text-primary" />
-                Dados Pessoais
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Full Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="full_name" className="text-foreground font-medium">
-                    Nome Completo
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="full_name"
-                      value={profile.full_name}
-                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                      placeholder="Seu nome completo"
-                      className="input-soft pl-12"
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground font-medium">
-                    E-mail
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                      placeholder="seu@email.com"
-                      className="input-soft pl-12"
-                      disabled
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado</p>
-                </div>
-
-                {/* Phone */}
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-foreground font-medium">
-                    Telefone para Contato
-                  </Label>
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={profile.phone}
-                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                      placeholder="(00) 00000-0000"
-                      className="input-soft pl-12"
-                    />
-                  </div>
-                </div>
-
-                {/* Allergy Info */}
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="allergy_info" className="text-foreground font-medium">
-                    <span className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-[hsl(var(--caution))]" />
-                      Alergias
-                    </span>
-                  </Label>
-                  <Input
-                    id="allergy_info"
-                    value={profile.allergy_info}
-                    onChange={(e) => setProfile({ ...profile, allergy_info: e.target.value })}
-                    placeholder="Ex: APLV, ovo, soja..."
-                    className="input-soft"
-                  />
-                </div>
-
-                {/* Observation */}
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="observation" className="text-foreground font-medium">
-                    <span className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-primary" />
-                      Observações
-                    </span>
-                  </Label>
-                  <Textarea
-                    id="observation"
-                    value={profile.observation}
-                    onChange={(e) => setProfile({ ...profile, observation: e.target.value })}
-                    placeholder="Informações adicionais importantes, como remédios que você tem alergia (mesmo sem proteína do leite), ou qualquer outro detalhe relevante..."
-                    className="input-soft min-h-[120px] resize-none"
-                  />
-                </div>
+      <main className="flex-1 lg:ml-64 w-full">
+        <div className="w-full h-full p-4 md:p-6 lg:p-8">
+          <div className="w-full max-w-4xl lg:max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
+              <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-6 gap-3">
+                <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-md bg-card">
+                  <Menu className="w-5 h-5 text-foreground" />
+                </button>
               </div>
-
-              {/* Save Button */}
-              <div className="mt-8 flex justify-end">
-                <Button 
-                  onClick={handleSave} 
-                  disabled={saving}
-                  className="btn-primary px-8"
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => navigate(-1)}
+                  className="p-2 rounded-md bg-card"
                 >
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </Button>
+                  ←
+                </button>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground">Meu Perfil</h1>
+                  <p className="text-sm md:text-base text-muted-foreground mt-2">
+                    Gerencie suas informações pessoais e acompanhe suas consultas
+                  </p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Stats Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-5 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
+              <Card className="card-soft bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                <CardContent className="p-4 md:p-5">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Search className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xl md:text-2xl font-bold text-foreground">{stats.consultations}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">Consultas realizadas</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="card-soft bg-gradient-to-br from-secondary to-secondary/50 border-secondary">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <ShoppingCart className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stats.medications_purchased}</p>
+                      <p className="text-sm text-muted-foreground">Remédios comprados</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="card-soft bg-gradient-to-br from-[hsl(var(--safe)/0.1)] to-[hsl(var(--safe)/0.05)] border-[hsl(var(--safe)/0.3)]">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[hsl(var(--safe)/0.2)] flex items-center justify-center">
+                      <Pill className="w-6 h-6 text-[hsl(var(--safe))]" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stats.safe_medications}</p>
+                      <p className="text-sm text-muted-foreground">Seguros identificados</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="card-soft bg-gradient-to-br from-[hsl(var(--risk)/0.1)] to-[hsl(var(--risk)/0.05)] border-[hsl(var(--risk)/0.3)]">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[hsl(var(--risk)/0.2)] flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6 text-[hsl(var(--risk))]" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stats.risk_medications}</p>
+                      <p className="text-sm text-muted-foreground">Com risco encontrados</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Baby Manager */}
+            <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
+              <BabyManager />
+            </div>
+
+            {/* Profile Form */}
+            <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <User className="w-5 h-5 text-primary" />
+                  Dados Pessoais
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Full Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name" className="text-foreground font-medium">
+                      Nome Completo
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="full_name"
+                        value={profile.full_name}
+                        onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                        placeholder="Seu nome completo"
+                        className="input-soft pl-12"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-foreground font-medium">
+                      E-mail
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profile.email}
+                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                        placeholder="seu@email.com"
+                        className="input-soft pl-12"
+                        disabled
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado</p>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-foreground font-medium">
+                      Telefone para Contato
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={profile.phone}
+                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                        placeholder="(00) 00000-0000"
+                        className="input-soft pl-12"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Allergy Info */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="allergy_info" className="text-foreground font-medium">
+                      <span className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-[hsl(var(--caution))]" />
+                        Alergias
+                      </span>
+                    </Label>
+                    <Input
+                      id="allergy_info"
+                      value={profile.allergy_info}
+                      onChange={(e) => setProfile({ ...profile, allergy_info: e.target.value })}
+                      placeholder="Ex: APLV, ovo, soja..."
+                      className="input-soft"
+                    />
+                  </div>
+
+                  {/* Observation */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="observation" className="text-foreground font-medium">
+                      <span className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-primary" />
+                        Observações
+                      </span>
+                    </Label>
+                    <Textarea
+                      id="observation"
+                      value={profile.observation}
+                      onChange={(e) => setProfile({ ...profile, observation: e.target.value })}
+                      placeholder="Informações adicionais importantes, como remédios que você tem alergia (mesmo sem proteína do leite), ou qualquer outro detalhe relevante..."
+                      className="input-soft min-h-[120px] resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="mt-8 flex justify-end">
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={saving}
+                    className="btn-primary px-8"
+                  >
+                    {saving ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
 
