@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, AlertTriangle, FileText, Search, ShoppingCart, Pill } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import BabyManager from "@/components/BabyManager";
+import ChatWidget from "@/components/ChatWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -195,8 +197,13 @@ const ProfilePage = () => {
             </Card>
           </div>
 
+          {/* Baby Manager */}
+          <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
+            <BabyManager />
+          </div>
+
           {/* Profile Form */}
-          <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.2s" }}>
+          <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.3s" }}>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <User className="w-5 h-5 text-primary" />
@@ -217,23 +224,6 @@ const ProfilePage = () => {
                       value={profile.full_name}
                       onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                       placeholder="Seu nome completo"
-                      className="input-soft pl-12"
-                    />
-                  </div>
-                </div>
-
-                {/* Child Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="child_name" className="text-foreground font-medium">
-                    Nome do Bebê
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="child_name"
-                      value={profile.child_name}
-                      onChange={(e) => setProfile({ ...profile, child_name: e.target.value })}
-                      placeholder="Nome do seu bebê"
                       className="input-soft pl-12"
                     />
                   </div>
@@ -326,6 +316,8 @@ const ProfilePage = () => {
           </Card>
         </div>
       </main>
+
+      <ChatWidget />
     </div>
   );
 };

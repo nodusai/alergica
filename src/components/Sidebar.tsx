@@ -1,8 +1,9 @@
-import { Home, User, Settings, Pill, LogOut } from "lucide-react";
+import { Home, User, Settings, Pill } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -37,13 +38,16 @@ const Sidebar = () => {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Pill className="w-5 h-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Pill className="w-5 h-5 text-primary" />
+            </div>
+            <h1 className="text-xl font-extrabold text-sidebar-foreground">
+              Aler<span className="text-primary">Gica</span>
+            </h1>
           </div>
-          <h1 className="text-xl font-extrabold text-sidebar-foreground">
-            Aler<span className="text-primary">Gica</span>
-          </h1>
+          <ThemeToggle />
         </div>
       </div>
 

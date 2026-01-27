@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
 import OnboardingModal from "@/components/OnboardingModal";
 import APLVInfoCarousel from "@/components/APLVInfoCarousel";
+import ChatWidget from "@/components/ChatWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -160,7 +161,7 @@ const Dashboard = () => {
           {/* Results Section */}
           <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
             <h3 className="text-lg font-bold text-foreground mb-5">
-              Resultados Recentes
+              Mais Procurados pelas Mães
             </h3>
             
             {/* Medication Grid */}
@@ -192,6 +193,8 @@ const Dashboard = () => {
           </section>
         </div>
       </main>
+
+      <ChatWidget />
     </div>
   );
 };

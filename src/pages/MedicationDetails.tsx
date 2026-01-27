@@ -1,5 +1,7 @@
 import { AlertTriangle, FileText, Pill, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
+import ChatWidget from "@/components/ChatWidget";
 
 // Mock ingredient data
 const mockIngredients = [
@@ -13,6 +15,8 @@ const mockIngredients = [
 ];
 
 const MedicationDetails = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar with Meu Perfil active */}
@@ -22,7 +26,10 @@ const MedicationDetails = () => {
       <main className="flex-1 ml-64 p-8">
         <div className="max-w-6xl mx-auto">
           {/* Back Button */}
-          <button className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <button 
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+          >
             <span>← Voltar para busca</span>
           </button>
 
@@ -117,6 +124,8 @@ const MedicationDetails = () => {
           </div>
         </div>
       </main>
+
+      <ChatWidget />
     </div>
   );
 };
