@@ -31,10 +31,11 @@ const Index = () => {
           <h1 className="animate-fade-in-up font-heading text-4xl font-extrabold tracking-tight text-foreground md:text-6xl">
             Aler<span className="text-gradient-primary">Gica</span>
           </h1>
-          <p className="mt-4 max-w-xl animate-fade-in-up text-lg text-muted-foreground" style={{ animationDelay: "0.15s" }}>
-            Plataforma inteligente para gerenciamento de alergias alimentares.
-            Segurança e praticidade para sua família.
-          </p>
+          <div className="mt-4 max-w-xl animate-fade-in-up text-lg text-foreground" style={{ animationDelay: "0.15s" }}>
+            <p>Eu sou a AlerGica,</p>
+            <p>a assistente estratégica para sua saúde.</p>
+            <p className="mt-2">Com nossa tecnologia, você consulta produtos e medicamentos, descobrindo alérgenos ocultos, para que você viva com mais segurança.</p>
+          </div>
           <div className="mt-8 flex gap-3 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
             <Button size="lg" className="gap-2 rounded-full bg-primary font-bold text-primary-foreground shadow-lg hover:bg-primary/90">
               Começar agora
