@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Pill, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Pill, ShoppingBag, UtensilsCrossed, ImagePlus } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import MedicationCard from "@/components/MedicationCard";
 import ProductCard from "@/components/ProductCard";
 import RestaurantCard from "@/components/RestaurantCard";
 import APLVInfoCarousel from "@/components/APLVInfoCarousel";
+import { Button } from "@/components/ui/button";
 import type { ModuleType } from "@/components/BottomNav";
 
 type RiskLevel = "safe" | "caution" | "risk";
@@ -34,10 +36,12 @@ interface HomeContentProps {
 }
 
 const HomeContent = ({ onModuleChange }: HomeContentProps) => {
+  const { user } = useAuth();
   const [emblaRef] = useEmblaCarousel({ loop: true });
   const [topMeds, setTopMeds] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [topRestaurants, setTopRestaurants] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchTop = async () => {
@@ -53,19 +57,39 @@ const HomeContent = ({ onModuleChange }: HomeContentProps) => {
     fetchTop();
   }, []);
 
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      setIsAdmin(!!data);
+    };
+    checkAdmin();
+  }, [user]);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* APLV Info as "Novidades" */}
       <APLVInfoCarousel />
 
       {/* Image Carousel */}
-      <section>
+      <section className="relative">
+        {isAdmin && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="absolute top-2 right-2 z-10 gap-1"
+            onClick={() => {/* TODO: open image management modal */}}
+          >
+            <ImagePlus className="w-4 h-4" />
+            Editar
+          </Button>
+        )}
         <div className="overflow-hidden rounded-2xl" ref={emblaRef}>
           <div className="flex">
             {CAROUSEL_IMAGES.map((img, i) => (
               <div key={i} className="flex-[0_0_100%] min-w-0">
-                <div className="aspect-[16/7] bg-secondary rounded-2xl flex items-center justify-center">
-                  <img src={img.src} alt={img.alt} className="w-24 h-24 opacity-30" />
+                <div className="aspect-[3/1] bg-secondary rounded-2xl flex items-center justify-center">
+                  <img src={img.src} alt={img.alt} className="w-16 h-16 opacity-30" />
                 </div>
               </div>
             ))}

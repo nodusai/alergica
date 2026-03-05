@@ -28,8 +28,8 @@ const BottomNav = ({ activeModule, onModuleChange }: BottomNavProps) => {
   ];
 
   return (
-    <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center">
-      <ExpandableTabs
+    <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <ExpandableTabs className="pointer-events-auto"
         tabs={tabs}
         selected={MODULE_INDEX[activeModule]}
         onSelect={(index) => onModuleChange(INDEX_MODULE[index])}

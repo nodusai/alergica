@@ -14,6 +14,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 
+const PROFILE_TYPE_LABELS: Record<string, string> = {
+  alergico: "Pessoa alérgica",
+  mamae: "Mãe da pessoa alérgica",
+  papai: "Pai da pessoa alérgica",
+  medico: "Médico(a)",
+  farmaceutica: "Farmacêutico(a)",
+};
+
 interface ProfileData {
   full_name: string;
   child_name: string;
@@ -21,6 +29,7 @@ interface ProfileData {
   phone: string;
   allergy_info: string;
   observation: string;
+  profile_type: string;
 }
 
 const ProfilePage = () => {
@@ -35,6 +44,7 @@ const ProfilePage = () => {
     phone: "",
     allergy_info: "",
     observation: "",
+    profile_type: "",
   });
   
   const [saving, setSaving] = useState(false);
@@ -72,6 +82,7 @@ const ProfilePage = () => {
           phone: "",
           allergy_info: "",
           observation: "",
+          profile_type: data.profile_type || "",
         });
       } else {
         setProfile(prev => ({
@@ -271,6 +282,23 @@ const ProfilePage = () => {
                     </div>
                     <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado</p>
                   </div>
+
+                  {/* Profile Type */}
+                  {profile.profile_type && (
+                    <div className="space-y-2">
+                      <Label className="text-foreground font-medium">
+                        Tipo de Perfil
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          value={PROFILE_TYPE_LABELS[profile.profile_type] || profile.profile_type}
+                          className="input-soft pl-12"
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Phone */}
                   <div className="space-y-2">
