@@ -1,1 +1,7 @@
 project_id = "hxfzsqezrxsoecctemve"
+
+[functions.bulk-import]
+verify_jwt = false
+
+[functions.create-admin-user]
+verify_jwt = false

@@ -14,16 +14,333 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      babies: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      feedback: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      medications: {
+        Row: {
+          access_count: number | null
+          arquivo_url: string | null
+          avisos: Json | null
+          composicao: string | null
+          created_at: string
+          data_extracao: string | null
+          detalhes_atencao: Json | null
+          detalhes_criticos: Json | null
+          id: string
+          nivel_alerta: string | null
+          nome_alternativo: string | null
+          nome_completo: string | null
+          nome_principal: string | null
+          tem_risco_aplv: boolean | null
+          termos_encontrados: Json | null
+          updated_at: string
+        }
+        Insert: {
+          access_count?: number | null
+          arquivo_url?: string | null
+          avisos?: Json | null
+          composicao?: string | null
+          created_at?: string
+          data_extracao?: string | null
+          detalhes_atencao?: Json | null
+          detalhes_criticos?: Json | null
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          tem_risco_aplv?: boolean | null
+          termos_encontrados?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          access_count?: number | null
+          arquivo_url?: string | null
+          avisos?: Json | null
+          composicao?: string | null
+          created_at?: string
+          data_extracao?: string | null
+          detalhes_atencao?: Json | null
+          detalhes_criticos?: Json | null
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          tem_risco_aplv?: boolean | null
+          termos_encontrados?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          access_count: number | null
+          avisos: Json | null
+          composicao: string | null
+          created_at: string
+          id: string
+          nivel_alerta: string | null
+          nome_alternativo: string | null
+          nome_completo: string | null
+          nome_principal: string | null
+          tem_risco_aplv: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          access_count?: number | null
+          avisos?: Json | null
+          composicao?: string | null
+          created_at?: string
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          tem_risco_aplv?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          access_count?: number | null
+          avisos?: Json | null
+          composicao?: string | null
+          created_at?: string
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          tem_risco_aplv?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          child_name: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          profile_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          child_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          profile_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          child_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          profile_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      restaurants: {
+        Row: {
+          access_count: number | null
+          avisos: Json | null
+          created_at: string
+          descricao: string | null
+          endereco: string | null
+          id: string
+          nivel_alerta: string | null
+          nome_alternativo: string | null
+          nome_completo: string | null
+          nome_principal: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_count?: number | null
+          avisos?: Json | null
+          created_at?: string
+          descricao?: string | null
+          endereco?: string | null
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_count?: number | null
+          avisos?: Json | null
+          created_at?: string
+          descricao?: string | null
+          endereco?: string | null
+          id?: string
+          nivel_alerta?: string | null
+          nome_alternativo?: string | null
+          nome_completo?: string | null
+          nome_principal?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      solicitado_inclusao: {
+        Row: {
+          composicao: string | null
+          created_at: string
+          id: string
+          imagem_url: string | null
+          nome: string | null
+          status: string | null
+          tipo: string | null
+          user_id: string
+        }
+        Insert: {
+          composicao?: string | null
+          created_at?: string
+          id?: string
+          imagem_url?: string | null
+          nome?: string | null
+          status?: string | null
+          tipo?: string | null
+          user_id: string
+        }
+        Update: {
+          composicao?: string | null
+          created_at?: string
+          id?: string
+          imagem_url?: string | null
+          nome?: string | null
+          status?: string | null
+          tipo?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      suggestions: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_onboarding: {
+        Row: {
+          completed_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +467,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
