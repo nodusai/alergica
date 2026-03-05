@@ -225,13 +225,8 @@ const ProfilePage = () => {
               </Card>
             </div>
 
-            {/* Baby Manager */}
-            <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
-              <BabyManager />
-            </div>
-
             {/* Profile Form */}
-            <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.3s" }}>
+            <Card className="card-soft animate-fade-in" style={{ animationDelay: "0.2s" }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
                   <User className="w-5 h-5 text-primary" />
@@ -342,6 +337,11 @@ const ProfilePage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Baby Manager */}
+            <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              <BabyManager />
+            </div>
           </div>
         </div>
       </main>

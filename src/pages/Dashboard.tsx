@@ -34,6 +34,7 @@ const alertToText = (nivel: string | null, temRisco: boolean | null): string => 
 };
 
 const PROFILE_TEXTS: Record<string, { greeting: string; section: string; placeholder: string }> = {
+  alergico: { greeting: "", section: "Mais Procurados", placeholder: "Qual item vamos conferir hoje?" },
   mamae: { greeting: "Mamãe", section: "Mais Procurados pelas Mães", placeholder: "Qual item vamos conferir hoje, mamãe?" },
   papai: { greeting: "Papai", section: "Mais Procurados pelos Pais", placeholder: "Qual item vamos conferir hoje, papai?" },
   farmaceutica: { greeting: "Farmacêutica", section: "Mais Procurados", placeholder: "Qual item vamos conferir hoje, farmacêutico(a)?" },
