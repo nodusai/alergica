@@ -26,6 +26,7 @@ const AuthPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [profileType, setProfileType] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { signIn, signUp, user } = useAuth();
@@ -95,6 +96,10 @@ const AuthPage = () => {
     if (password !== confirmPassword) {
       newErrors.confirmPassword = "As senhas não coincidem";
     }
+
+    if (!profileType) {
+      newErrors.profileType = "Selecione quem você é";
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -126,7 +131,7 @@ const AuthPage = () => {
     if (!validateSignup()) return;
     
     setLoading(true);
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, password, fullName, profileType);
     setLoading(false);
     
     if (error) {
@@ -423,6 +428,26 @@ const AuthPage = () => {
                   </button>
                 </div>
                 {errors.confirmPassword && <p className="text-sm text-destructive mt-1">{errors.confirmPassword}</p>}
+              </div>
+
+              {/* Profile Type Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Quem é você?
+                </label>
+                <select
+                  value={profileType}
+                  onChange={(e) => setProfileType(e.target.value)}
+                  className={`input-soft w-full ${errors.profileType ? "border-destructive" : ""} ${!profileType ? "text-muted-foreground/60" : ""}`}
+                >
+                  <option value="" disabled>Selecione uma opção</option>
+                  <option value="alergico">Pessoa alérgica</option>
+                  <option value="mamae">Mãe da pessoa alérgica</option>
+                  <option value="papai">Pai da pessoa alérgica</option>
+                  <option value="medico">Médico(a)</option>
+                  <option value="farmaceutica">Farmacêutico(a)</option>
+                </select>
+                {errors.profileType && <p className="text-sm text-destructive mt-1">{errors.profileType}</p>}
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
