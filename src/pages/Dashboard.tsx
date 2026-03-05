@@ -1,65 +1,61 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Search, LogOut, Menu } from "lucide-react";
+import { Search, Menu, Plus, Construction } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
+import ProductCard from "@/components/ProductCard";
+import RestaurantCard from "@/components/RestaurantCard";
 import OnboardingModal from "@/components/OnboardingModal";
 import APLVInfoCarousel from "@/components/APLVInfoCarousel";
 import ChatWidget from "@/components/ChatWidget";
 import BottomNav from "@/components/BottomNav";
+import type { ModuleType } from "@/components/BottomNav";
+import AddMedicationModal from "@/components/AddMedicationModal";
+import AddProductModal from "@/components/AddProductModal";
+import AddRestaurantModal from "@/components/AddRestaurantModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
 
-const mockMedications = [
-  {
-    id: 1,
-    name: "Dipirona Gotas",
-    laboratory: "Medley",
-    riskLevel: "safe" as const,
-    riskText: "Seguro (Sem Leite)",
-  },
-  {
-    id: 2,
-    name: "Amoxicilina Suspensão",
-    laboratory: "EMS",
-    riskLevel: "caution" as const,
-    riskText: "Atenção (Risco de Traços)",
-  },
-  {
-    id: 3,
-    name: "Vitamina D Gotas",
-    laboratory: "Aché",
-    riskLevel: "risk" as const,
-    riskText: "Risco Alto (Contém Lactose)",
-  },
-  {
-    id: 4,
-    name: "Paracetamol Infantil",
-    laboratory: "Novalgina",
-    riskLevel: "safe" as const,
-    riskText: "Seguro (Sem Leite)",
-  },
-  {
-    id: 5,
-    name: "Ibuprofeno Gotas",
-    laboratory: "Neo Química",
-    riskLevel: "caution" as const,
-    riskText: "Atenção (Verificar Lote)",
-  },
-  {
-    id: 6,
-    name: "Polivitamínico",
-    laboratory: "Sundown",
-    riskLevel: "risk" as const,
-    riskText: "Risco Alto (Derivados do Leite)",
-  },
-];
+type RiskLevel = "safe" | "caution" | "risk";
+
+const alertToRisk = (nivel: string | null): RiskLevel => {
+  if (nivel === "VERDE") return "safe";
+  if (nivel === "AMARELO") return "caution";
+  return "risk";
+};
+
+const alertToText = (nivel: string | null, temRisco: boolean | null): string => {
+  if (nivel === "VERDE") return "Seguro (Sem Leite)";
+  if (nivel === "AMARELO") return "Atenção (Verificar)";
+  return temRisco ? "Risco Alto (Contém Derivados)" : "Risco (Verificar Composição)";
+};
+
+const PROFILE_TEXTS: Record<string, { greeting: string; section: string; placeholder: string }> = {
+  mamae: { greeting: "Mamãe", section: "Mais Procurados pelas Mães", placeholder: "Qual item vamos conferir hoje, mamãe?" },
+  papai: { greeting: "Papai", section: "Mais Procurados pelos Pais", placeholder: "Qual item vamos conferir hoje, papai?" },
+  farmaceutica: { greeting: "Farmacêutica", section: "Mais Procurados", placeholder: "Qual item vamos conferir hoje, farmacêutico(a)?" },
+  medico: { greeting: "Médico(a)", section: "Mais Procurados", placeholder: "Qual item vamos conferir hoje, doutor(a)?" },
+};
+
+const MODULE_LABELS: Record<ModuleType, string> = {
+  medications: "Medicamentos",
+  products: "Produtos",
+  restaurants: "Restaurantes",
+  nutrition: "Nutrição",
+};
 
 const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [userName, setUserName] = useState("Mamãe");
+  const [userName, setUserName] = useState("");
+  const [profileType, setProfileType] = useState("mamae");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeModule, setActiveModule] = useState<ModuleType>("medications");
+  const [items, setItems] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -69,37 +65,52 @@ const Dashboard = () => {
     }
   }, [user, loading, navigate]);
 
+  // Check admin role
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      setIsAdmin(!!data);
+    };
+    if (user) checkAdmin();
+  }, [user]);
+
+  // Profile & onboarding
   useEffect(() => {
     const checkOnboarding = async () => {
       if (!user) return;
-      
-      // Check if user has completed onboarding
-      const { data } = await supabase
-        .from("user_onboarding")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (!data) {
-        setShowOnboarding(true);
-      }
+      const { data } = await supabase.from("user_onboarding").select("id").eq("user_id", user.id).maybeSingle();
+      if (!data) setShowOnboarding(true);
 
-      // Get user name from profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (profile?.full_name) {
-        setUserName(profile.full_name.split(" ")[0]);
-      }
+      const { data: profile } = await supabase.from("profiles").select("full_name, profile_type").eq("user_id", user.id).maybeSingle();
+      if (profile?.full_name) setUserName(profile.full_name.split(" ")[0]);
+      if (profile?.profile_type) setProfileType(profile.profile_type);
     };
-
-    if (user) {
-      checkOnboarding();
-    }
+    if (user) checkOnboarding();
   }, [user]);
+
+  // Fetch items based on active module
+  const fetchItems = useCallback(async () => {
+    if (activeModule === "nutrition") {
+      setItems([]);
+      return;
+    }
+
+    const table = activeModule === "medications" ? "medications" : activeModule === "products" ? "products" : "restaurants";
+    
+    let query = supabase.from(table).select("*").order("access_count", { ascending: false }).limit(50);
+
+    if (searchQuery.trim()) {
+      query = query.or(`nome_principal.ilike.%${searchQuery.trim()}%,nome_completo.ilike.%${searchQuery.trim()}%`);
+    }
+
+    const { data } = await query;
+    setItems(data || []);
+  }, [activeModule, searchQuery]);
+
+  useEffect(() => {
+    if (user) fetchItems();
+  }, [user, fetchItems]);
 
   const handleOnboardingComplete = async () => {
     if (user) {
@@ -108,10 +119,8 @@ const Dashboard = () => {
     setShowOnboarding(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
+  const texts = PROFILE_TEXTS[profileType] || PROFILE_TEXTS.mamae;
+  const greetingName = userName || texts.greeting;
 
   if (loading) {
     return (
@@ -121,80 +130,149 @@ const Dashboard = () => {
     );
   }
 
+  const renderContent = () => {
+    if (activeModule === "nutrition") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <Construction className="w-16 h-16 text-primary" />
+          <h3 className="text-xl font-bold text-foreground">Em Desenvolvimento</h3>
+          <p className="text-muted-foreground max-w-md">
+            O módulo de Nutrição está sendo construído com muito carinho e estará disponível em breve! 💜
+          </p>
+        </div>
+      );
+    }
+
+    if (activeModule === "medications") {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+          {items.map((med, index) => (
+            <Link to={`/medication/${med.id}`} key={med.id} style={{ animationDelay: `${0.1 + index * 0.05}s` }}>
+              <MedicationCard
+                name={med.nome_principal || "Sem nome"}
+                laboratory={med.nome_alternativo || ""}
+                riskLevel={alertToRisk(med.nivel_alerta)}
+                riskText={alertToText(med.nivel_alerta, med.tem_risco_aplv)}
+              />
+            </Link>
+          ))}
+        </div>
+      );
+    }
+
+    if (activeModule === "products") {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+          {items.map((prod, index) => (
+            <div key={prod.id} style={{ animationDelay: `${0.1 + index * 0.05}s` }}>
+              <ProductCard
+                name={prod.nome_principal || "Sem nome"}
+                subtitle={prod.nome_alternativo || ""}
+                riskLevel={alertToRisk(prod.nivel_alerta)}
+                riskText={alertToText(prod.nivel_alerta, prod.tem_risco_aplv)}
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (activeModule === "restaurants") {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+          {items.map((rest, index) => (
+            <div key={rest.id} style={{ animationDelay: `${0.1 + index * 0.05}s` }}>
+              <RestaurantCard
+                name={rest.nome_principal || "Sem nome"}
+                description={rest.descricao || ""}
+                address={rest.endereco || undefined}
+                riskLevel={alertToRisk(rest.nivel_alerta)}
+                riskText={alertToText(rest.nivel_alerta, false)}
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen w-full bg-background flex">
-      {/* Onboarding Modal */}
       <OnboardingModal open={showOnboarding} onComplete={handleOnboardingComplete} />
 
-      {/* Sidebar - Desktop */}
       <div className="hidden lg:block">
         <Sidebar />
       </div>
 
-      {/* Mobile Drawer (controlled via state; trigger is a header button) */}
       <Drawer open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <DrawerContent className="h-[85vh]">
           <Sidebar isDrawer={true} onClose={() => setSidebarOpen(false)} />
         </DrawerContent>
       </Drawer>
 
-      {/* Main Content */}
       <main className="flex-1 lg:ml-64 w-full">
-        <div className="w-full h-full p-4 md:p-6 lg:p-8 pb-20">
+        <div className="w-full h-full p-4 md:p-6 lg:p-8 pb-24">
           <div className="w-full max-w-4xl lg:max-w-7xl mx-auto">
-            {/* Header with Search */}
+            {/* Header */}
             <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
               <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-6 gap-3">
                 <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1 rounded-md bg-card">
                   <Menu className="w-5 h-5 text-foreground" />
                 </button>
                 <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground text-center pr-2 mr-2 flex-1">
-                  Olá, {userName}! 👋
+                  Olá, {greetingName}! 👋
                 </h2>
               </div>
-              {/* Search Bar */}
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 md:left-4 lg:left-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Qual medicamento vamos conferir hoje, mamãe?"
+                  placeholder={texts.placeholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full py-3 md:py-4 lg:py-5 px-8 md:px-8 lg:px-10 text-sm md:text-base lg:text-lg rounded-xl md:rounded-2xl lg:rounded-2xl border-2 border-input bg-card shadow-soft transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/20 focus:outline-none placeholder:text-muted-foreground/60"
                 />
               </div>
             </div>
 
-            {/* APLV Info Carousel */}
-            <APLVInfoCarousel />
+            {activeModule === "medications" && <APLVInfoCarousel />}
 
             {/* Results Section */}
             <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
-              <h3 className="text-base md:text-lg lg:text-lg font-bold text-foreground mb-3 md:mb-4 lg:mb-5">
-                Mais Procurados pelas Mães
-              </h3>
-
-              {/* Medication Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-                {mockMedications.map((med, index) => (
-                  <Link 
-                    to="/medication/1"
-                    key={med.id} 
-                    style={{ animationDelay: `${0.1 + index * 0.05}s` }}
-                  >
-                    <MedicationCard
-                      name={med.name}
-                      laboratory={med.laboratory}
-                      riskLevel={med.riskLevel}
-                      riskText={med.riskText}
-                    />
-                  </Link>
-                ))}
+              <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-5">
+                <h3 className="text-base md:text-lg lg:text-lg font-bold text-foreground">
+                  {activeModule === "nutrition" ? "Nutrição" : `${texts.section} - ${MODULE_LABELS[activeModule]}`}
+                </h3>
+                {isAdmin && activeModule !== "nutrition" && (
+                  <Button size="sm" onClick={() => setShowAddModal(true)} className="gap-1">
+                    <Plus className="w-4 h-4" />
+                    Adicionar
+                  </Button>
+                )}
               </div>
+
+              {items.length === 0 && activeModule !== "nutrition" ? (
+                <p className="text-muted-foreground text-center py-10">
+                  {searchQuery ? "Nenhum resultado encontrado." : "Nenhum item cadastrado ainda."}
+                </p>
+              ) : (
+                renderContent()
+              )}
             </section>
           </div>
         </div>
       </main>
+
       <ChatWidget />
-      <BottomNav />
+      <BottomNav activeModule={activeModule} onModuleChange={(m) => { setActiveModule(m); setSearchQuery(""); }} />
+
+      {/* Admin Modals */}
+      <AddMedicationModal open={showAddModal && activeModule === "medications"} onOpenChange={setShowAddModal} onSuccess={fetchItems} />
+      <AddProductModal open={showAddModal && activeModule === "products"} onOpenChange={setShowAddModal} onSuccess={fetchItems} />
+      <AddRestaurantModal open={showAddModal && activeModule === "restaurants"} onOpenChange={setShowAddModal} onSuccess={fetchItems} />
     </div>
   );
 };
