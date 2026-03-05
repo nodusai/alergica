@@ -88,7 +88,7 @@ const APLVInfoCarousel = () => {
             <BookOpen className="w-3.5 h-3.5 md:w-5 md:h-5 text-primary" />
           </div>
           <h3 className="text-xs md:text-base lg:text-lg font-bold text-foreground">
-            Informações sobre APLV
+            Novidades - Informações sobre APLV
           </h3>
         </div>
         <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground self-end md:self-auto">
