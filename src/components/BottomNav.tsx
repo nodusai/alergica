@@ -23,7 +23,7 @@ const BottomNav = ({ activeModule, onModuleChange }: BottomNavProps) => {
     { label: "Início", icon: Home },
     { label: "Medicamentos", icon: Pill },
     { label: "Produtos", icon: ShoppingBag },
-    { label: "Restaurante", icon: UtensilsCrossed },
+    { label: "Restaurantes", icon: UtensilsCrossed },
     { label: "Nutrição", icon: Apple },
   ];
 
