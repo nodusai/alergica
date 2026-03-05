@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Newspaper, ChevronRight, Pill, ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Pill, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import { supabase } from "@/integrations/supabase/client";
 import MedicationCard from "@/components/MedicationCard";
 import ProductCard from "@/components/ProductCard";
 import RestaurantCard from "@/components/RestaurantCard";
+import APLVInfoCarousel from "@/components/APLVInfoCarousel";
 import type { ModuleType } from "@/components/BottomNav";
 
 type RiskLevel = "safe" | "caution" | "risk";
@@ -21,12 +22,6 @@ const alertToText = (nivel: string | null, temRisco: boolean | null): string => 
   if (nivel === "AMARELO") return "Atenção (Verificar)";
   return temRisco ? "Risco Alto (Contém Derivados)" : "Risco (Verificar Composição)";
 };
-
-const NEWS_CARDS = [
-  { title: "Novas diretrizes sobre APLV", description: "Confira as últimas atualizações sobre o manejo da alergia à proteína do leite de vaca.", icon: "📋" },
-  { title: "Receitas sem leite", description: "Descubra receitas deliciosas e seguras para toda a família.", icon: "🍳" },
-  { title: "Dicas para o dia a dia", description: "Como lidar com a APLV na rotina escolar e em restaurantes.", icon: "💡" },
-];
 
 const CAROUSEL_IMAGES = [
   { src: "/placeholder.svg", alt: "Banner 1" },
@@ -60,22 +55,8 @@ const HomeContent = ({ onModuleChange }: HomeContentProps) => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* News Cards */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Newspaper className="w-5 h-5 text-primary" />
-          <h3 className="text-base md:text-lg font-bold text-foreground">Novidades</h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {NEWS_CARDS.map((card, i) => (
-            <div key={i} className="card-soft p-4 hover:scale-[1.02] transition-transform cursor-pointer">
-              <div className="text-2xl mb-2">{card.icon}</div>
-              <h4 className="font-semibold text-foreground text-sm">{card.title}</h4>
-              <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* APLV Info as "Novidades" */}
+      <APLVInfoCarousel />
 
       {/* Image Carousel */}
       <section>

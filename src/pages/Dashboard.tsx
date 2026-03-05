@@ -6,7 +6,7 @@ import MedicationCard from "@/components/MedicationCard";
 import ProductCard from "@/components/ProductCard";
 import RestaurantCard from "@/components/RestaurantCard";
 import OnboardingModal from "@/components/OnboardingModal";
-import APLVInfoCarousel from "@/components/APLVInfoCarousel";
+
 import ChatWidget from "@/components/ChatWidget";
 import BottomNav from "@/components/BottomNav";
 import type { ModuleType } from "@/components/BottomNav";
@@ -245,7 +245,7 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {activeModule === "medications" && <APLVInfoCarousel />}
+                
 
                 {/* Results Section */}
                 <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
