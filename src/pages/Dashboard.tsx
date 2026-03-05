@@ -94,7 +94,7 @@ const Dashboard = () => {
 
   // Fetch items based on active module
   const fetchItems = useCallback(async () => {
-    if (activeModule === "nutrition" || activeModule === "home") {
+    if (activeModule === "nutrition" || activeModule === "home" || activeModule === "products" || activeModule === "restaurants") {
       setItems([]);
       return;
     }
@@ -134,13 +134,14 @@ const Dashboard = () => {
   }
 
   const renderContent = () => {
-    if (activeModule === "nutrition") {
+    if (activeModule === "nutrition" || activeModule === "products" || activeModule === "restaurants") {
+      const moduleLabel = MODULE_LABELS[activeModule];
       return (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <Construction className="w-16 h-16 text-primary" />
           <h3 className="text-xl font-bold text-foreground">Em Desenvolvimento</h3>
           <p className="text-muted-foreground max-w-md">
-            O módulo de Nutrição está sendo construído com muito carinho e estará disponível em breve! 💜
+            O módulo de {moduleLabel} está sendo construído com muito carinho e estará disponível em breve! 💜
           </p>
         </div>
       );
@@ -158,41 +159,6 @@ const Dashboard = () => {
                 riskText={alertToText(med.nivel_alerta, med.tem_risco_aplv)}
               />
             </Link>
-          ))}
-        </div>
-      );
-    }
-
-    if (activeModule === "products") {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-          {items.map((prod, index) => (
-            <div key={prod.id} style={{ animationDelay: `${0.1 + index * 0.05}s` }}>
-              <ProductCard
-                name={prod.nome_principal || "Sem nome"}
-                subtitle={prod.nome_alternativo || ""}
-                riskLevel={alertToRisk(prod.nivel_alerta)}
-                riskText={alertToText(prod.nivel_alerta, prod.tem_risco_aplv)}
-              />
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (activeModule === "restaurants") {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-          {items.map((rest, index) => (
-            <div key={rest.id} style={{ animationDelay: `${0.1 + index * 0.05}s` }}>
-              <RestaurantCard
-                name={rest.nome_principal || "Sem nome"}
-                description={rest.descricao || ""}
-                address={rest.endereco || undefined}
-                riskLevel={alertToRisk(rest.nivel_alerta)}
-                riskText={alertToText(rest.nivel_alerta, false)}
-              />
-            </div>
           ))}
         </div>
       );
