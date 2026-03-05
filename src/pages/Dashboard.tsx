@@ -6,6 +6,7 @@ import MedicationCard from "@/components/MedicationCard";
 import OnboardingModal from "@/components/OnboardingModal";
 import APLVInfoCarousel from "@/components/APLVInfoCarousel";
 import ChatWidget from "@/components/ChatWidget";
+import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
@@ -139,7 +140,7 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="flex-1 lg:ml-64 w-full">
-        <div className="w-full h-full p-4 md:p-6 lg:p-8">
+        <div className="w-full h-full p-4 md:p-6 lg:p-8 pb-20">
           <div className="w-full max-w-4xl lg:max-w-7xl mx-auto">
             {/* Header with Search */}
             <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
@@ -193,6 +194,7 @@ const Dashboard = () => {
         </div>
       </main>
       <ChatWidget />
+      <BottomNav />
     </div>
   );
 };
