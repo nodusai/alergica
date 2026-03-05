@@ -10,6 +10,7 @@ import APLVInfoCarousel from "@/components/APLVInfoCarousel";
 import ChatWidget from "@/components/ChatWidget";
 import BottomNav from "@/components/BottomNav";
 import type { ModuleType } from "@/components/BottomNav";
+import HomeContent from "@/components/HomeContent";
 import AddMedicationModal from "@/components/AddMedicationModal";
 import AddProductModal from "@/components/AddProductModal";
 import AddRestaurantModal from "@/components/AddRestaurantModal";
@@ -40,6 +41,7 @@ const PROFILE_TEXTS: Record<string, { greeting: string; section: string; placeho
 };
 
 const MODULE_LABELS: Record<ModuleType, string> = {
+  home: "Início",
   medications: "Medicamentos",
   products: "Produtos",
   restaurants: "Restaurantes",
@@ -51,7 +53,7 @@ const Dashboard = () => {
   const [userName, setUserName] = useState("");
   const [profileType, setProfileType] = useState("mamae");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeModule, setActiveModule] = useState<ModuleType>("medications");
+  const [activeModule, setActiveModule] = useState<ModuleType>("home");
   const [items, setItems] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -91,7 +93,7 @@ const Dashboard = () => {
 
   // Fetch items based on active module
   const fetchItems = useCallback(async () => {
-    if (activeModule === "nutrition") {
+    if (activeModule === "nutrition" || activeModule === "home") {
       setItems([]);
       return;
     }
@@ -215,53 +217,60 @@ const Dashboard = () => {
       <main className="flex-1 lg:ml-64 w-full">
         <div className="w-full h-full p-4 md:p-6 lg:p-8 pb-24">
           <div className="w-full max-w-4xl lg:max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
-              <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-6 gap-3">
-                <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1 rounded-md bg-card">
-                  <Menu className="w-5 h-5 text-foreground" />
-                </button>
-                <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground text-center pr-2 mr-2 flex-1">
-                  Olá, {greetingName}! 👋
-                </h2>
-              </div>
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 md:left-4 lg:left-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder={texts.placeholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full py-3 md:py-4 lg:py-5 px-8 md:px-8 lg:px-10 text-sm md:text-base lg:text-lg rounded-xl md:rounded-2xl lg:rounded-2xl border-2 border-input bg-card shadow-soft transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/20 focus:outline-none placeholder:text-muted-foreground/60"
-                />
-              </div>
+            {/* Mobile menu button + greeting (always visible) */}
+            <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-6 gap-3 animate-fade-in">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1 rounded-md bg-card">
+                <Menu className="w-5 h-5 text-foreground" />
+              </button>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground text-center pr-2 mr-2 flex-1">
+                Olá, {greetingName}! 👋
+              </h2>
             </div>
 
-            {activeModule === "medications" && <APLVInfoCarousel />}
+            {activeModule === "home" ? (
+              <HomeContent onModuleChange={(m) => { setActiveModule(m); setSearchQuery(""); }} />
+            ) : (
+              <>
+                {/* Search */}
+                <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
+                  <div className="relative">
+                    <Search className="absolute left-3 md:left-4 lg:left-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder={texts.placeholder}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full py-3 md:py-4 lg:py-5 px-8 md:px-8 lg:px-10 text-sm md:text-base lg:text-lg rounded-xl md:rounded-2xl lg:rounded-2xl border-2 border-input bg-card shadow-soft transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/20 focus:outline-none placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+                </div>
 
-            {/* Results Section */}
-            <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
-              <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-5">
-                <h3 className="text-base md:text-lg lg:text-lg font-bold text-foreground">
-                  {activeModule === "nutrition" ? "Nutrição" : `${texts.section} - ${MODULE_LABELS[activeModule]}`}
-                </h3>
-                {isAdmin && activeModule !== "nutrition" && (
-                  <Button size="sm" onClick={() => setShowAddModal(true)} className="gap-1">
-                    <Plus className="w-4 h-4" />
-                    Adicionar
-                  </Button>
-                )}
-              </div>
+                {activeModule === "medications" && <APLVInfoCarousel />}
 
-              {items.length === 0 && activeModule !== "nutrition" ? (
-                <p className="text-muted-foreground text-center py-10">
-                  {searchQuery ? "Nenhum resultado encontrado." : "Nenhum item cadastrado ainda."}
-                </p>
-              ) : (
-                renderContent()
-              )}
-            </section>
+                {/* Results Section */}
+                <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
+                  <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-5">
+                    <h3 className="text-base md:text-lg lg:text-lg font-bold text-foreground">
+                      {activeModule === "nutrition" ? "Nutrição" : `${texts.section} - ${MODULE_LABELS[activeModule]}`}
+                    </h3>
+                    {isAdmin && activeModule !== "nutrition" && (
+                      <Button size="sm" onClick={() => setShowAddModal(true)} className="gap-1">
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </Button>
+                    )}
+                  </div>
+
+                  {items.length === 0 && activeModule !== "nutrition" ? (
+                    <p className="text-muted-foreground text-center py-10">
+                      {searchQuery ? "Nenhum resultado encontrado." : "Nenhum item cadastrado ainda."}
+                    </p>
+                  ) : (
+                    renderContent()
+                  )}
+                </section>
+              </>
+            )}
           </div>
         </div>
       </main>

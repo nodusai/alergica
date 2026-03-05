@@ -77,7 +77,7 @@ const ChatWidget = () => {
       {/* Mascot Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-5 right-5 lg:bottom-6 lg:right-6 z-[100] w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-card shadow-lg border-2 border-primary/30 transition-all duration-300 hover:scale-110 hover:shadow-xl ${
+        className={`fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[100] w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-card shadow-lg border-2 border-primary/30 transition-all duration-300 hover:scale-110 hover:shadow-xl ${
           isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"
         }`}
       >
@@ -90,7 +90,7 @@ const ChatWidget = () => {
 
       {/* Widget Panel */}
       <div
-        className={`fixed bottom-5 right-5 lg:bottom-6 lg:right-6 z-[100] w-[calc(100vw-2.5rem)] max-w-sm lg:w-80 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden transition-all duration-300 ${
+        className={`fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[100] w-[calc(100vw-2.5rem)] max-w-sm lg:w-80 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden transition-all duration-300 ${
           isOpen
             ? "scale-100 opacity-100 translate-y-0"
             : "scale-95 opacity-0 translate-y-4 pointer-events-none"

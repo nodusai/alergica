@@ -1,16 +1,17 @@
-import { Pill, ShoppingBag, UtensilsCrossed, Apple } from "lucide-react";
+import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple } from "lucide-react";
 import { ExpandableTabs, Tab } from "@/components/ui/expandable-tabs";
 
-export type ModuleType = "medications" | "products" | "restaurants" | "nutrition";
+export type ModuleType = "home" | "medications" | "products" | "restaurants" | "nutrition";
 
 const MODULE_INDEX: Record<ModuleType, number> = {
-  medications: 0,
-  products: 1,
-  restaurants: 2,
-  nutrition: 3,
+  home: 0,
+  medications: 1,
+  products: 2,
+  restaurants: 3,
+  nutrition: 4,
 };
 
-const INDEX_MODULE: ModuleType[] = ["medications", "products", "restaurants", "nutrition"];
+const INDEX_MODULE: ModuleType[] = ["home", "medications", "products", "restaurants", "nutrition"];
 
 interface BottomNavProps {
   activeModule: ModuleType;
@@ -19,6 +20,7 @@ interface BottomNavProps {
 
 const BottomNav = ({ activeModule, onModuleChange }: BottomNavProps) => {
   const tabs: Tab[] = [
+    { label: "Início", icon: Home },
     { label: "Medicamentos", icon: Pill },
     { label: "Produtos", icon: ShoppingBag },
     { label: "Restaurante", icon: UtensilsCrossed },
