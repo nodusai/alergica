@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOnClickOutside } from "usehooks-ts";
 import { LucideIcon } from "lucide-react";
@@ -14,6 +14,8 @@ interface ExpandableTabsProps {
   tabs: Tab[];
   className?: string;
   activeColor?: string;
+  selected?: number | null;
+  onSelect?: (index: number) => void;
 }
 
 const buttonVariants = {
@@ -33,18 +35,17 @@ const spanVariants = {
 
 const transition = { delay: 0.05, type: "spring" as const, bounce: 0, duration: 0.35 };
 
-export function ExpandableTabs({ tabs, className, activeColor = "hsl(var(--primary))" }: ExpandableTabsProps) {
-  const [selected, setSelected] = useState<number | null>(null);
+export function ExpandableTabs({ tabs, className, activeColor = "hsl(var(--primary))", selected, onSelect }: ExpandableTabsProps) {
   const outsideRef = useRef<HTMLDivElement>(null!);
 
-  useOnClickOutside(outsideRef, () => setSelected(null));
+  useOnClickOutside(outsideRef, () => {});
 
   const handleSelect = useCallback(
     (index: number) => {
-      setSelected(index);
+      onSelect?.(index);
       tabs[index].onClick?.();
     },
-    [tabs]
+    [tabs, onSelect]
   );
 
   return (
