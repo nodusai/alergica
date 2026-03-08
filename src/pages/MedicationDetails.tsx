@@ -71,7 +71,7 @@ const MedicationDetails = () => {
     fetchMedication();
   }, [id, navigate]);
 
-  const riskKey = medToRisk(medication?.tem_risco_aplv, medication?.nivel_alerta);
+  const riskKey = medToRisk(medication?.tem_risco_aplv, medication?.nivel_alerta, medication?.avisos);
   const riskConfig = RISK_CONFIG[riskKey];
   const RiskIcon = riskConfig.icon;
 

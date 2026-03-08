@@ -7,6 +7,7 @@ export type MedRow = {
   nome_completo: string | null;
   tem_risco_aplv: boolean | null;
   nivel_alerta: string | null;
+  avisos: string | null;
   access_count: number;
 };
 
@@ -21,15 +22,23 @@ export type MedicationDetail = MedRow & {
 };
 
 const LIST_SELECT =
-  "id, nome_principal, nome_alternativo, nome_completo, tem_risco_aplv, nivel_alerta, access_count";
+  "id, nome_principal, nome_alternativo, nome_completo, tem_risco_aplv, nivel_alerta, avisos, access_count";
 
 export const medToRisk = (
   temRisco: boolean | null | undefined,
   nivel: string | null | undefined,
+  avisos?: unknown,
 ): "safe" | "caution" | "risk" => {
   const n = (nivel ?? "").toLowerCase();
+  const avStr = Array.isArray(avisos)
+    ? (avisos as unknown[]).map(String).join(" ")
+    : String(avisos ?? "");
+  const av = avStr.toLowerCase();
+
   if (n.includes("crítico") || n.includes("critico") || n.includes("proibido")) return "risk";
+  if (av.includes("crítico") || av.includes("critico") || av.includes("proibido") || av.includes("🔴")) return "risk";
   if (n.includes("atenção") || n.includes("atencao") || n.includes("cuidado")) return "caution";
+  if (av.includes("atenção") || av.includes("atencao") || av.includes("cuidado") || av.includes("🟡")) return "caution";
   if (temRisco === true) return "risk";
   if (temRisco === false) return "safe";
   if (n.includes("seguro") || n.includes("liberado")) return "safe";

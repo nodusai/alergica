@@ -131,7 +131,7 @@ const Dashboard = () => {
   const filteredSearchResults =
     riskFilter === "all"
       ? searchResults
-      : searchResults.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta) === riskFilter);
+      : searchResults.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
 
   const displayMeds = searchQuery.trim() ? filteredSearchResults : popularMedications;
   const sectionTitle = searchQuery.trim() ? "Resultados da Busca" : "Mais Procurados";
@@ -235,7 +235,7 @@ const Dashboard = () => {
               const filteredMeds =
                 riskFilter === "all"
                   ? baseMeds
-                  : baseMeds.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta) === riskFilter);
+                  : baseMeds.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
               const isLoading = searchQuery.trim() ? searching : loadingMedTab;
 
               return (

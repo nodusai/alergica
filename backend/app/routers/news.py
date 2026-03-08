@@ -19,8 +19,8 @@ async def fetch_aplv_news():
         raise HTTPException(status_code=500, detail="NEWS_API_KEY not configured")
 
     queries = [
-        {"q": "APLV bebê leite", "language": "pt"},
-        {"q": "MSPI baby milk allergy", "language": "en"},
+        {"q": "alergia leite bebê", "language": "pt"},
+        {"q": "milk protein allergy baby", "language": "en"},
         {"q": "APLV bébé lait", "language": "fr"},
     ]
 
@@ -37,7 +37,8 @@ async def fetch_aplv_news():
                 "apiKey": api_key,
             }
             resp = await client.get("https://newsapi.org/v2/everything", params=params)
-            resp.raise_for_status()
+            if resp.status_code != 200:
+              print(resp.text)
             data = resp.json()
             for a in data.get("articles", []):
                 url = a.get("url")
@@ -53,7 +54,9 @@ async def fetch_aplv_news():
                     })
 
     articles.sort(
-        key=lambda a: datetime.fromisoformat(a["publishedAt"]) if a.get("publishedAt") else datetime.min,
+        key=lambda a: datetime.fromisoformat(
+            a["publishedAt"].replace("Z", "+00:00")
+        ) if a.get("publishedAt") else datetime.min,
         reverse=True,
     )
     return articles[:10]

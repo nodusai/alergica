@@ -81,31 +81,85 @@ const APLVInfoCarousel = () => {
   const [refreshing, setRefreshing] = useState(false);
   const { isAdmin } = useAuth();
 
-  const fetchNews = async () => {
-    try {
-      const res = await fetch("/api/news");
-      if (!res.ok) {
-        console.warn("backend news request failed", res.status);
-        return;
-      }
-      const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        console.info("backend returned no news");
-        return;
-      }
-
-      const newsSlides: Slide[] = data.map((a: any) => ({
+  /** Normaliza artigos brutos da NewsAPI para o formato Slide */
+  const normalizeArticles = (articles: any[]): Slide[] =>
+    articles
+      .filter((a: any) => a.url && a.title && !a.title.includes("[Removed]"))
+      .slice(0, 10)
+      .map((a: any) => ({
         titulo: a.title,
         mensagem: a.description ?? "",
-        referencia: `${a.source} · ${new Date(a.publishedAt).toLocaleDateString("pt-BR")}`,
+        referencia: `${a.source?.name ?? a.source ?? ""} · ${a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("pt-BR") : ""}`,
         url: a.url,
         isNews: true,
       }));
 
-      setSlides([...newsSlides, ...aplvInfoData]);
+  /** Fallback: chama NewsAPI direto via proxy Vite quando o backend Python está offline */
+  const fetchNewsDirect = async (): Promise<Slide[]> => {
+    const apiKey = import.meta.env.VITE_NEWS_API_KEY as string | undefined;
+    if (!apiKey) return [];
+
+    const queries = [
+      { q: "APLV bebê leite", language: "pt" },
+      { q: "MSPI baby milk allergy", language: "en" },
+    ];
+
+    const seen = new Set<string>();
+    const articles: any[] = [];
+
+    for (const q of queries) {
+      const params = new URLSearchParams({
+        q: q.q,
+        language: q.language,
+        sortBy: "publishedAt",
+        pageSize: "5",
+        apiKey,
+      });
+      try {
+        const res = await fetch(`/newsapi/v2/everything?${params}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        for (const a of data.articles ?? []) {
+          if (a.url && !seen.has(a.url)) {
+            seen.add(a.url);
+            articles.push(a);
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return normalizeArticles(articles);
+  };
+
+  const fetchNews = async () => {
+    try {
+      // 1ª tentativa: backend Python
+      const res = await fetch("/api/news");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const newsSlides: Slide[] = data.map((a: any) => ({
+            titulo: a.title,
+            mensagem: a.description ?? "",
+            referencia: `${a.source} · ${new Date(a.publishedAt).toLocaleDateString("pt-BR")}`,
+            url: a.url,
+            isNews: true,
+          }));
+          setSlides([...newsSlides, ...aplvInfoData]);
+          return;
+        }
+      }
+
+      // 2ª tentativa: NewsAPI direto via proxy Vite
+      const directSlides = await fetchNewsDirect();
+      if (directSlides.length > 0) {
+        setSlides([...directSlides, ...aplvInfoData]);
+      }
     } catch (err) {
       console.error("fetchNews error", err);
-      // silently fall back to static data
+      // mantém slides estáticos como fallback final
     }
   };
 
