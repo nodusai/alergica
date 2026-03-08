@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   getPopularMedications,
   getRecentMedications,
+  getMedicationsByRisk,
   searchMedications,
   medToRisk,
   MedRow,
@@ -53,6 +54,7 @@ const PlaceholderModule = ({ label }: { label: string }) => (
 
 const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userProfileType, setUserProfileType] = useState<string | null>(null);
   const [userName, setUserName] = useState("Mamãe");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleTab>("inicio");
@@ -79,10 +81,11 @@ const Dashboard = () => {
     const init = async () => {
       const [onboardingRes, profileRes, popular] = await Promise.all([
         supabase.from("user_onboarding").select("id").eq("user_id", user.id).maybeSingle(),
-        supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+        supabase.from("profiles").select("full_name, profile_type").eq("user_id", user.id).maybeSingle(),
         getPopularMedications().catch(() => [] as MedRow[]),
       ]);
 
+      if (profileRes.data?.profile_type) setUserProfileType(profileRes.data.profile_type);
       if (!onboardingRes.data) setShowOnboarding(true);
       if (profileRes.data?.full_name) setUserName(profileRes.data.full_name.split(" ")[0]);
       setPopularMedications(popular);
@@ -115,13 +118,18 @@ const Dashboard = () => {
   }, [searchQuery]);
 
   useEffect(() => {
-    if (activeModule !== "medicamentos" || medTabMeds.length > 0) return;
+    if (activeModule !== "medicamentos") return;
     setLoadingMedTab(true);
-    getRecentMedications(50)
+    setMedTabMeds([]);
+    const loader =
+      riskFilter === "all"
+        ? getRecentMedications(50)
+        : getMedicationsByRisk(riskFilter);
+    loader
       .then(setMedTabMeds)
       .catch(() => {})
       .finally(() => setLoadingMedTab(false));
-  }, [activeModule]);
+  }, [activeModule, riskFilter]);
 
   const handleOnboardingComplete = async () => {
     if (user) await supabase.from("user_onboarding").insert({ user_id: user.id });
@@ -146,7 +154,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen w-full bg-background flex">
-      <OnboardingModal open={showOnboarding} onComplete={handleOnboardingComplete} />
+      <OnboardingModal open={showOnboarding} onComplete={handleOnboardingComplete} profileType={userProfileType} />
 
       <div className="hidden lg:block">
         <Sidebar />
@@ -231,11 +239,9 @@ const Dashboard = () => {
 
             {/* Medicamentos module */}
             {activeModule === "medicamentos" && (() => {
-              const baseMeds = searchQuery.trim() ? filteredSearchResults : medTabMeds;
-              const filteredMeds =
-                riskFilter === "all"
-                  ? baseMeds
-                  : baseMeds.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
+              // Se há busca ativa, filtra client-side nos resultados da busca
+              // Sem busca, medTabMeds já vem filtrado do servidor
+              const filteredMeds = searchQuery.trim() ? filteredSearchResults : medTabMeds;
               const isLoading = searchQuery.trim() ? searching : loadingMedTab;
 
               return (

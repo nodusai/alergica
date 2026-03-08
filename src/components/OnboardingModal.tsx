@@ -9,12 +9,16 @@ const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
 
 type Step = "welcome" | "input" | "loading" | "result" | "editing";
 
+const HEALTH_PROFESSIONAL_TYPES = ["farmaceutico", "medico"];
+
 interface OnboardingModalProps {
   open: boolean;
   onComplete: () => void;
+  profileType?: string | null;
 }
 
-const OnboardingModal = ({ open, onComplete }: OnboardingModalProps) => {
+const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps) => {
+  const isHealthProfessional = !!profileType && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
   const { user } = useAuth();
   const [step, setStep] = useState<Step>("welcome");
   const [allergyInput, setAllergyInput] = useState("");
@@ -122,7 +126,7 @@ const OnboardingModal = ({ open, onComplete }: OnboardingModalProps) => {
               em cada escolha.
             </p>
             <button
-              onClick={() => setStep("input")}
+              onClick={() => isHealthProfessional ? onComplete() : setStep("input")}
               className="btn-primary w-full text-lg"
             >
               Entendi

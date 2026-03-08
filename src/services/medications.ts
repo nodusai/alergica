@@ -78,6 +78,31 @@ export const getRecentMedications = async (limit = 10): Promise<MedRow[]> => {
   return data ?? [];
 };
 
+export const getMedicationsByRisk = async (
+  risk: "safe" | "caution" | "risk"
+): Promise<MedRow[]> => {
+  let query = supabase
+    .from("medications")
+    .select(LIST_SELECT)
+    .order("nome_principal", { ascending: true });
+
+  if (risk === "safe") {
+    query = query.eq("tem_risco_aplv", false);
+  } else if (risk === "risk") {
+    query = query.eq("tem_risco_aplv", true);
+  } else {
+    // caution: nível de alerta com palavras-chave OU tem_risco_aplv nulo (classificação padrão)
+    query = query.or(
+      "nivel_alerta.ilike.%aten%,nivel_alerta.ilike.%cuidado%,tem_risco_aplv.is.null"
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // Refinamento client-side para garantir precisão (o avisos pode mudar a classificação)
+  return (data ?? []).filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === risk);
+};
+
 export const searchMedications = async (q: string, limit = 12): Promise<MedRow[]> => {
   const { data, error } = await supabase
     .from("medications")

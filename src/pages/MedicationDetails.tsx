@@ -6,6 +6,10 @@ import ChatWidget from "@/components/ChatWidget";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMedication, recordMedicationView, medToRisk, parseTextField, MedicationDetail } from "@/services/medications";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+const HEALTH_PROFESSIONAL_TYPES = ["farmaceutico", "medico"];
 
 type Medication = MedicationDetail;
 
@@ -42,10 +46,12 @@ const RISK_CONFIG = {
 const MedicationDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [medication, setMedication] = useState<Medication | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileType, setProfileType] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -70,6 +76,18 @@ const MedicationDetails = () => {
 
     fetchMedication();
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("profile_type")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setProfileType(data?.profile_type ?? null));
+  }, [user]);
+
+  const isHealthProfessional = profileType !== null && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
 
   const riskKey = medToRisk(medication?.tem_risco_aplv, medication?.nivel_alerta, medication?.avisos);
   const riskConfig = RISK_CONFIG[riskKey];
@@ -138,7 +156,7 @@ const MedicationDetails = () => {
                 </button>
               </div>
             ) : medication ? (
-              <div className="grid lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
+              <div className={`grid gap-4 md:gap-6 lg:gap-8 ${isHealthProfessional ? "grid-cols-1 max-w-xl" : "lg:grid-cols-2"}`}>
                 {/* Left Column */}
                 <div className="space-y-4 md:space-y-6 animate-fade-in">
                   <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center">
@@ -186,7 +204,8 @@ const MedicationDetails = () => {
                   )}
                 </div>
 
-                {/* Right Column */}
+                {/* Right Column — oculto para farmacêuticos e médicos */}
+                {!isHealthProfessional && (
                 <div className="space-y-4 md:space-y-6 animate-slide-in-right">
                   <div className="card-soft">
                     <h2 className="text-lg md:text-xl font-bold text-foreground mb-4 md:mb-6 flex items-center gap-2">
@@ -244,6 +263,7 @@ const MedicationDetails = () => {
                     </p>
                   </div>
                 </div>
+                )}
               </div>
             ) : null}
           </div>
