@@ -60,7 +60,7 @@ interface ScanResult {
   details?: string;
 }
 
-// ─── COMPONENTE ──────────────────────────────────────────────────────────────
+// -─── COMPONENTE ──────────────────────────────────────────────────────────────
 export default function ProductScanner() {
   const [stage, setStage] = useState<Stage>("idle");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
