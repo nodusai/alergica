@@ -91,9 +91,10 @@ export const getMedicationsByRisk = async (
   } else if (risk === "risk") {
     query = query.eq("tem_risco_aplv", true);
   } else {
-    // caution: nível de alerta com palavras-chave OU tem_risco_aplv nulo (classificação padrão)
+    // caution: "AMARELO" é o valor real no banco para atenção;
+    // também captura via avisos (🟡/ATENÇÃO) e nivel_alerta com palavras-chave
     query = query.or(
-      "nivel_alerta.ilike.%aten%,nivel_alerta.ilike.%cuidado%,tem_risco_aplv.is.null"
+      "nivel_alerta.ilike.%amarelo%,nivel_alerta.ilike.%aten%,nivel_alerta.ilike.%cuidado%,avisos.ilike.%aten%,avisos.ilike.%🟡%,tem_risco_aplv.is.null"
     );
   }
 
