@@ -19,6 +19,7 @@ import {
 } from "@/services/medications";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import ProductScanner from "@/components/ProductScanner";
 
 
 type RiskLevel = "safe" | "caution" | "risk";
@@ -290,7 +291,7 @@ const Dashboard = () => {
               );
             })()}
 
-            {activeModule === "produtos" && <PlaceholderModule label="Módulo de Produtos" />}
+            {activeModule === "produtos" && <ProductScanner />}
             {activeModule === "restaurantes" && <PlaceholderModule label="Módulo de Restaurantes" />}
             {activeModule === "nutricao" && <PlaceholderModule label="Módulo de Nutrição" />}
           </div>

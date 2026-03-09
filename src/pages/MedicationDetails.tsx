@@ -11,6 +11,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 const HEALTH_PROFESSIONAL_TYPES = ["farmaceutico", "medico"];
 
+/** Separa a composição em princípios ativos e excipientes */
+const parseComposicao = (raw: string): { ativos: string[]; excipientes: string[] } => {
+  const excipienteSep = /\.\s*Excipientes?:/i;
+  const parts = raw.split(excipienteSep);
+
+  const parseItems = (str: string) =>
+    str
+      .split(/[;,]/)
+      .map((s) => s.trim().replace(/\.$/, ""))
+      .filter(Boolean);
+
+  return {
+    ativos: parseItems(parts[0] ?? ""),
+    excipientes: parseItems(parts[1] ?? ""),
+  };
+};
+
 type Medication = MedicationDetail;
 
 const RISK_CONFIG = {
@@ -156,7 +173,7 @@ const MedicationDetails = () => {
                 </button>
               </div>
             ) : medication ? (
-              <div className={`grid gap-4 md:gap-6 lg:gap-8 ${isHealthProfessional ? "grid-cols-1 max-w-xl" : "lg:grid-cols-2"}`}>
+              <div className="grid lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
                 {/* Left Column */}
                 <div className="space-y-4 md:space-y-6 animate-fade-in">
                   <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center">
@@ -204,45 +221,79 @@ const MedicationDetails = () => {
                   )}
                 </div>
 
-                {/* Right Column — oculto para farmacêuticos e médicos */}
-                {!isHealthProfessional && (
+                {/* Right Column — composição visível para todos; análise IA oculta para profissionais */}
                 <div className="space-y-4 md:space-y-6 animate-slide-in-right">
                   <div className="card-soft">
                     <h2 className="text-lg md:text-xl font-bold text-foreground mb-4 md:mb-6 flex items-center gap-2">
                       <FileText className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                      Análise da Composição
+                      Composição
                     </h2>
 
-                    {medication.composicao ? (
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {medication.composicao}
-                      </p>
-                    ) : (
+                    {medication.composicao ? (() => {
+                      const { ativos, excipientes } = parseComposicao(medication.composicao!);
+                      return (
+                        <div className="space-y-5">
+                          {ativos.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                Princípios Ativos
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {ativos.map((item, i) => (
+                                  <span key={i} className="inline-block px-3 py-1.5 rounded-lg bg-primary/8 border border-primary/20 text-xs text-foreground leading-snug">
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {excipientes.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                Excipientes
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {excipientes.map((item, i) => (
+                                  <span key={i} className="inline-block px-3 py-1.5 rounded-lg bg-secondary text-xs text-muted-foreground leading-snug">
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })() : (
                       <p className="text-sm text-muted-foreground text-center py-6">
                         Composição detalhada não disponível.
                       </p>
                     )}
 
-                    {criticos.length > 0 && (
-                      <div className="mt-4 p-4 rounded-xl bg-risk/10 border border-risk/30">
-                        <p className="text-xs font-semibold text-risk uppercase tracking-wide mb-1">
-                          Detalhes críticos
-                        </p>
-                        <div className="text-sm text-risk-foreground space-y-1">
-                          {criticos.map((c, i) => <p key={i}>{c}</p>)}
-                        </div>
-                      </div>
-                    )}
+                    {/* Análise da IA — oculta para farmacêuticos e médicos */}
+                    {!isHealthProfessional && (
+                      <>
+                        {criticos.length > 0 && (
+                          <div className="mt-4 p-4 rounded-xl bg-risk/10 border border-risk/30">
+                            <p className="text-xs font-semibold text-risk uppercase tracking-wide mb-1">
+                              Detalhes críticos
+                            </p>
+                            <div className="text-sm text-risk-foreground space-y-1">
+                              {criticos.map((c, i) => <p key={i}>{c}</p>)}
+                            </div>
+                          </div>
+                        )}
 
-                    {atencao.length > 0 && (
-                      <div className="mt-4 p-4 rounded-xl bg-caution/10 border border-caution/30">
-                        <p className="text-xs font-semibold text-caution uppercase tracking-wide mb-1">
-                          Detalhes de atenção
-                        </p>
-                        <div className="text-sm text-caution-foreground space-y-1">
-                          {atencao.map((a, i) => <p key={i}>{a}</p>)}
-                        </div>
-                      </div>
+                        {atencao.length > 0 && (
+                          <div className="mt-4 p-4 rounded-xl bg-caution/10 border border-caution/30">
+                            <p className="text-xs font-semibold text-caution uppercase tracking-wide mb-1">
+                              Detalhes de atenção
+                            </p>
+                            <div className="text-sm text-caution-foreground space-y-1">
+                              {atencao.map((a, i) => <p key={i}>{a}</p>)}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <button
@@ -263,7 +314,6 @@ const MedicationDetails = () => {
                     </p>
                   </div>
                 </div>
-                )}
               </div>
             ) : null}
           </div>
