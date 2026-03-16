@@ -2,14 +2,13 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useOnClickOutside } from "usehooks-ts";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 
 interface Tab {
   title: string;
   icon: LucideIcon;
-  type?: never;
+  type?: undefined;
 }
 
 interface Separator {
@@ -47,7 +46,7 @@ const spanVariants = {
   exit: { width: 0, opacity: 0 },
 };
 
-const transition = { delay: 0.1, type: "spring", bounce: 0, duration: 0.6 };
+const transition = { delay: 0.1, type: "spring" as const, bounce: 0, duration: 0.6 };
 
 export function ExpandableTabs({
   tabs,
@@ -64,7 +63,7 @@ export function ExpandableTabs({
     onChange?.(index);
   };
 
-  const Separator = () => (
+  const SeparatorComponent = () => (
     <div className="mx-1 h-[24px] w-[1.2px] bg-border" aria-hidden="true" />
   );
 
@@ -78,13 +77,14 @@ export function ExpandableTabs({
     >
       {tabs.map((tab, index) => {
         if (tab.type === "separator") {
-          return <Separator key={`separator-${index}`} />;
+          return <SeparatorComponent key={`separator-${index}`} />;
         }
 
-        const Icon = tab.icon;
+        const tabItem = tab as Tab;
+        const Icon = tabItem.icon;
         return (
           <motion.button
-            key={tab.title}
+            key={tabItem.title}
             variants={buttonVariants}
             initial={false}
             animate="animate"
@@ -109,7 +109,7 @@ export function ExpandableTabs({
                   transition={transition}
                   className="overflow-hidden"
                 >
-                  {tab.title}
+                  {tabItem.title}
                 </motion.span>
               )}
             </AnimatePresence>

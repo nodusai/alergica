@@ -96,19 +96,20 @@ const ProfilePage = () => {
       if (!user) return;
       const { data } = await supabase
         .from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+      const d = data as Record<string, unknown> | null;
       const filled: ProfileData = {
-        full_name: data?.full_name || "",
-        child_name: data?.child_name || "",
+        full_name: (d?.full_name as string) || "",
+        child_name: (d?.child_name as string) || "",
         email: user.email || "",
-        phone: data?.phone || "",
-        allergy_info: data?.allergy_info || "",
-        observation: data?.observation || "",
-        profile_type: data?.profile_type || "",
-        birth_date: data?.birth_date || "",
-        gender: data?.gender || "",
-        city: data?.city || "",
-        state: data?.state || "",
-        profession: data?.profession || "",
+        phone: (d?.phone as string) || "",
+        allergy_info: (d?.allergy_info as string) || "",
+        observation: (d?.observation as string) || "",
+        profile_type: (d?.profile_type as string) || "",
+        birth_date: (d?.birth_date as string) || "",
+        gender: (d?.gender as string) || "",
+        city: (d?.city as string) || "",
+        state: (d?.state as string) || "",
+        profession: (d?.profession as string) || "",
       };
       setProfile(filled);
       setDraft(filled);
@@ -142,7 +143,7 @@ const ProfilePage = () => {
       state: draft.state || null,
       profession: draft.profession || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    } as any, { onConflict: "user_id" });
     setSaving(false);
     if (error) {
       toast({ title: "Erro ao salvar", description: "Tente novamente.", variant: "destructive" });

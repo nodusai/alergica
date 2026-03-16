@@ -14,7 +14,7 @@ export default defineConfig(() => ({
         target: "http://localhost:8000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
-        onError: (_err, _req, res) => {
+        onError: (_err: any, _req: any, res: any) => {
           res.writeHead(503, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Backend offline" }));
         },
@@ -24,7 +24,7 @@ export default defineConfig(() => ({
         target: "https://newsapi.org",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/newsapi/, ""),
-        onError: (_err, _req, res) => {
+        onError: (_err: any, _req: any, res: any) => {
           res.writeHead(503, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "NewsAPI offline" }));
         },

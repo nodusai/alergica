@@ -7,7 +7,7 @@ export type MedRow = {
   nome_completo: string | null;
   tem_risco_aplv: boolean | null;
   nivel_alerta: string | null;
-  avisos: string | null;
+  avisos: unknown;
   access_count: number;
 };
 
@@ -128,7 +128,7 @@ export const getMedication = async (id: string): Promise<MedicationDetail> => {
 
 export const recordMedicationView = async (id: string) => {
   try {
-    await supabase.rpc("increment_medication_access", { med_id: id });
+    await (supabase.rpc as any)("increment_medication_access", { med_id: id });
   } catch {
     // fire-and-forget
   }
