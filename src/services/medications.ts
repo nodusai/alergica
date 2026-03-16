@@ -7,7 +7,7 @@ export type MedRow = {
   nome_completo: string | null;
   tem_risco_aplv: boolean | null;
   nivel_alerta: string | null;
-  avisos: string | null;
+  avisos: unknown;
   access_count: number;
 };
 
