@@ -143,7 +143,7 @@ const ProfilePage = () => {
       state: draft.state || null,
       profession: draft.profession || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    } as any, { onConflict: "user_id" });
     setSaving(false);
     if (error) {
       toast({ title: "Erro ao salvar", description: "Tente novamente.", variant: "destructive" });
