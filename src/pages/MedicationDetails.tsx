@@ -69,6 +69,7 @@ const MedicationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileType, setProfileType] = useState<string | null>(null);
+  const [labPhotoUrl, setLabPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -103,6 +104,21 @@ const MedicationDetails = () => {
       .maybeSingle()
       .then(({ data }) => setProfileType(data?.profile_type ?? null));
   }, [user]);
+
+  // Fetch lab photo based on medication's nome_alternativo
+  useEffect(() => {
+    if (!medication?.nome_alternativo) {
+      setLabPhotoUrl(null);
+      return;
+    }
+    const labName = medication.nome_alternativo.trim().replace(/\.$/, "");
+    supabase
+      .from("laboratories")
+      .select("photo_url")
+      .ilike("name", labName)
+      .maybeSingle()
+      .then(({ data }) => setLabPhotoUrl(data?.photo_url ?? null));
+  }, [medication?.nome_alternativo]);
 
   const isHealthProfessional = profileType !== null && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
 
@@ -176,8 +192,12 @@ const MedicationDetails = () => {
               <div className="grid lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
                 {/* Left Column */}
                 <div className="space-y-4 md:space-y-6 animate-fade-in">
-                  <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center">
-                    <Pill className="w-20 h-20 md:w-24 md:h-24 text-muted-foreground/40" />
+                  <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center overflow-hidden">
+                    {labPhotoUrl ? (
+                      <img src={labPhotoUrl} alt={medication.nome_alternativo ?? "Laboratório"} className="w-full h-full object-contain p-4" />
+                    ) : (
+                      <Pill className="w-20 h-20 md:w-24 md:h-24 text-muted-foreground/40" />
+                    )}
                   </div>
 
                   <div>
