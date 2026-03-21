@@ -1,4 +1,4 @@
-import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, User, Settings, Lightbulb, LogOut } from "lucide-react";
+import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, FlaskConical, User, Settings, Lightbulb, LogOut } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
