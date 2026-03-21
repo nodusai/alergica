@@ -25,7 +25,7 @@ type Lab = {
 };
 
 const LaboratoriesPage = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [labs, setLabs] = useState<Lab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,8 @@ const LaboratoriesPage = () => {
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user && !isAdmin) navigate("/dashboard");
+  }, [user, authLoading, isAdmin, navigate]);
 
   const fetchLabs = async () => {
     setLoading(true);
