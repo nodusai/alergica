@@ -46,9 +46,12 @@ export const medToRisk = (
 };
 
 /** Parse a JSON-array-in-text field into a clean string list. */
-export const parseTextField = (raw: string | null): string[] => {
-  if (!raw) return [];
+export const parseTextField = (raw: unknown): string[] => {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw.map((s: unknown) => String(s).trim()).filter(Boolean);
+  if (typeof raw !== "string") return [String(raw)];
   const trimmed = raw.trim();
+  if (!trimmed) return [];
   if (trimmed.startsWith("[")) {
     try {
       const arr = JSON.parse(trimmed);
