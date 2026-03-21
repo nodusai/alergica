@@ -95,11 +95,9 @@ const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps
   const isWelcome = step === "welcome";
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onComplete(); }}>
       <DialogContent
-        className={`sm:max-w-lg p-0 overflow-hidden border-0 shadow-2xl bg-card rounded-3xl transition-all ${
-          isWelcome ? "[&>button:last-child]:hidden" : ""
-        }`}
+        className="sm:max-w-lg p-0 overflow-hidden border-0 shadow-2xl bg-card rounded-3xl transition-all"
         onInteractOutside={(e) => e.preventDefault()}
       >
         {/* STEP: WELCOME */}
