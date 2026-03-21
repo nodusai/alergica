@@ -45,15 +45,15 @@ const BabyManager = () => {
   const calculateAge = (birthDate: string): string => {
     const birth = new Date(birthDate);
     const today = new Date();
-    
+
     let years = today.getFullYear() - birth.getFullYear();
     let months = today.getMonth() - birth.getMonth();
-    
+
     if (months < 0) {
       years--;
       months += 12;
     }
-    
+
     if (today.getDate() < birth.getDate()) {
       months--;
       if (months < 0) {
@@ -155,9 +155,7 @@ const BabyManager = () => {
                   <div>
                     <p className="font-semibold text-foreground">{baby.name}</p>
                     {baby.birth_date && (
-                      <p className="text-sm text-muted-foreground">
-                        {calculateAge(baby.birth_date)}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{calculateAge(baby.birth_date)}</p>
                     )}
                   </div>
                 </div>
@@ -175,7 +173,6 @@ const BabyManager = () => {
 
         {/* Add New Baby Form */}
         <div className="pt-4 border-t border-border">
-          <p className="text-sm font-medium text-foreground mb-4">Adicionar novo bebê</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="baby_name" className="text-foreground">
@@ -221,9 +218,7 @@ const BabyManager = () => {
         </div>
 
         {babies.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Você ainda não adicionou nenhum bebê.
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-4">Você ainda não adicionou nenhum bebê.</p>
         )}
       </CardContent>
     </Card>
