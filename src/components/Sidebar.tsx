@@ -58,14 +58,38 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-6">
+      <nav className="flex-1 p-6 overflow-y-auto">
         <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-              (item.path === "/dashboard" && location.pathname === "/");
+          {mainNavItems.map((item) => {
+            const isActive = location.pathname === item.path && !item.module;
             
             return (
-              <li key={item.path}>
+              <li key={item.label}>
+                <NavLink
+                  to={item.path}
+                  onClick={isDrawer ? onClose : undefined}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    isActive
+                      ? "sidebar-link-active"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="my-4 border-t border-sidebar-border" />
+
+        <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
+          {secondaryNavItems.map((item) => {
+            const isActive = location.pathname === item.path && !item.module;
+            
+            return (
+              <li key={item.label}>
                 <NavLink
                   to={item.path}
                   onClick={isDrawer ? onClose : undefined}
