@@ -62,8 +62,9 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       <nav className="flex-1 p-6 overflow-y-auto">
         <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
           {mainNavItems.map((item) => {
-            const isActive = location.pathname === item.path && 
-              (item.module ? new URLSearchParams(location.search).get("module") === item.module : !new URLSearchParams(location.search).get("module"));
+            const isActive = item.module
+              ? location.pathname === item.path && new URLSearchParams(location.search).get("module") === item.module
+              : location.pathname === item.path;
             
             return (
               <li key={item.label}>
