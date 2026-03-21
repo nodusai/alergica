@@ -49,7 +49,8 @@ const LaboratoriesPage = () => {
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user && !isAdmin) navigate("/dashboard");
+  }, [user, authLoading, isAdmin, navigate]);
 
   const fetchLabs = async () => {
     setLoading(true);

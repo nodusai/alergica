@@ -17,7 +17,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
     { icon: ShoppingBag, label: "Produtos", path: "/dashboard", module: "produtos" },
     { icon: UtensilsCrossed, label: "Restaurantes", path: "/dashboard", module: "restaurantes" },
     { icon: Apple, label: "Nutrição", path: "/dashboard", module: "nutricao" },
-    { icon: FlaskConical, label: "Laboratórios", path: "/laboratories" },
+    ...(isAdmin ? [{ icon: FlaskConical, label: "Laboratórios", path: "/laboratories" }] : []),
   ];
 
   const secondaryNavItems = [
