@@ -197,7 +197,7 @@ const ProfilePage = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-5 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 lg:gap-5 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
               <Card className="card-soft bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
                 <CardContent className="p-4 md:p-5">
                   <div className="flex items-center gap-3 md:gap-4">
