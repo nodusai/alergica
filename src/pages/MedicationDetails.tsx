@@ -69,6 +69,7 @@ const MedicationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileType, setProfileType] = useState<string | null>(null);
+  const [labPhotoUrl, setLabPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
