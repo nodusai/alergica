@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   User, Mail, Phone, AlertTriangle, FileText, Search,
-  ShoppingCart, Pill, Menu, Calendar, MapPin, Briefcase,
+  Pill, Menu, Calendar, MapPin, Briefcase,
   BadgeCheck, Pencil, X,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
@@ -197,7 +197,7 @@ const ProfilePage = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-5 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 lg:gap-5 mb-8 animate-fade-in" style={{ animationDelay: "0.1s" }}>
               <Card className="card-soft bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
                 <CardContent className="p-4 md:p-5">
                   <div className="flex items-center gap-3 md:gap-4">
@@ -207,19 +207,6 @@ const ProfilePage = () => {
                     <div>
                       <p className="text-xl md:text-2xl font-bold text-foreground">{stats.consultations}</p>
                       <p className="text-xs md:text-sm text-muted-foreground">Consultas realizadas</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="card-soft bg-gradient-to-br from-secondary to-secondary/50 border-secondary">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <ShoppingCart className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{stats.medications_purchased}</p>
-                      <p className="text-sm text-muted-foreground">Remédios comprados</p>
                     </div>
                   </div>
                 </CardContent>

@@ -1,4 +1,4 @@
-import { User, Settings, LogOut } from "lucide-react";
+import { Home, User, Settings, LogOut } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -12,6 +12,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
   const navItems = [
+    { icon: Home, label: "Início", path: "/dashboard" },
     { icon: User, label: "Meu Perfil", path: "/profile" },
     { icon: Settings, label: "Configurações", path: "/settings" },
   ];
