@@ -72,7 +72,19 @@ const Dashboard = () => {
       setActiveModule("inicio");
     }
   }, [searchParams]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+
+  // Sync search query to URL
+  const updateSearchQuery = (value: string) => {
+    setSearchQuery(value);
+    const newParams = new URLSearchParams(searchParams);
+    if (value.trim()) {
+      newParams.set("q", value);
+    } else {
+      newParams.delete("q");
+    }
+    setSearchParams(newParams, { replace: true });
+  };
   const [searchResults, setSearchResults] = useState<MedRow[]>([]);
   const [popularMedications, setPopularMedications] = useState<MedRow[]>([]);
   const [loadingPopular, setLoadingPopular] = useState(true);
