@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import MedicationDetails from "./pages/MedicationDetails";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
+import LaboratoriesPage from "./pages/LaboratoriesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
