@@ -61,14 +61,17 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       <nav className="flex-1 p-6 overflow-y-auto">
         <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
           {mainNavItems.map((item) => {
-            const isActive = location.pathname === item.path && !item.module;
+            const isActive = location.pathname === item.path && 
+              (item.module ? new URLSearchParams(location.search).get("module") === item.module : !new URLSearchParams(location.search).get("module"));
             
             return (
               <li key={item.label}>
-                <NavLink
-                  to={item.path}
-                  onClick={isDrawer ? onClose : undefined}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                <button
+                  onClick={() => {
+                    navigate(item.module ? `${item.path}?module=${item.module}` : item.path);
+                    if (isDrawer && onClose) onClose();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
                     isActive
                       ? "sidebar-link-active"
                       : "text-sidebar-foreground hover:bg-sidebar-accent"
@@ -76,7 +79,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
                 >
                   <item.icon className="w-5 h-5" />
                   {item.label}
-                </NavLink>
+                </button>
               </li>
             );
           })}
