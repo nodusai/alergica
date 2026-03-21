@@ -192,8 +192,12 @@ const MedicationDetails = () => {
               <div className="grid lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
                 {/* Left Column */}
                 <div className="space-y-4 md:space-y-6 animate-fade-in">
-                  <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center">
-                    <Pill className="w-20 h-20 md:w-24 md:h-24 text-muted-foreground/40" />
+                  <div className="aspect-square max-w-full md:max-w-xs bg-secondary rounded-lg md:rounded-2xl flex items-center justify-center overflow-hidden">
+                    {labPhotoUrl ? (
+                      <img src={labPhotoUrl} alt={medication.nome_alternativo ?? "Laboratório"} className="w-full h-full object-contain p-4" />
+                    ) : (
+                      <Pill className="w-20 h-20 md:w-24 md:h-24 text-muted-foreground/40" />
+                    )}
                   </div>
 
                   <div>
