@@ -139,7 +139,7 @@ const MedicationDetails = () => {
                 <Menu className="w-5 h-5 text-foreground" />
               </button>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <span>← Voltar para busca</span>
