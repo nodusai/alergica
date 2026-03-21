@@ -105,6 +105,21 @@ const MedicationDetails = () => {
       .then(({ data }) => setProfileType(data?.profile_type ?? null));
   }, [user]);
 
+  // Fetch lab photo based on medication's nome_alternativo
+  useEffect(() => {
+    if (!medication?.nome_alternativo) {
+      setLabPhotoUrl(null);
+      return;
+    }
+    const labName = medication.nome_alternativo.trim().replace(/\.$/, "");
+    supabase
+      .from("laboratories")
+      .select("photo_url")
+      .ilike("name", labName)
+      .maybeSingle()
+      .then(({ data }) => setLabPhotoUrl(data?.photo_url ?? null));
+  }, [medication?.nome_alternativo]);
+
   const isHealthProfessional = profileType !== null && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
 
   const riskKey = medToRisk(medication?.tem_risco_aplv, medication?.nivel_alerta, medication?.avisos);
