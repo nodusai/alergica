@@ -136,7 +136,7 @@ const BabyManager = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
           <Baby className="w-5 h-5 text-primary" />
-          Meus Bebês
+          Meus Filhos(as)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
