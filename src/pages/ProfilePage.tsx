@@ -211,19 +211,6 @@ const ProfilePage = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="card-soft bg-gradient-to-br from-secondary to-secondary/50 border-secondary">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <ShoppingCart className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{stats.medications_purchased}</p>
-                      <p className="text-sm text-muted-foreground">Remédios comprados</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
               <Card className="card-soft bg-gradient-to-br from-[hsl(var(--safe)/0.1)] to-[hsl(var(--safe)/0.05)] border-[hsl(var(--safe)/0.3)]">
                 <CardContent className="p-5">
                   <div className="flex items-center gap-4">
