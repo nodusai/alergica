@@ -1,4 +1,4 @@
-import { Home, User, Settings, LogOut } from "lucide-react";
+import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, User, Settings, Lightbulb, LogOut } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -11,10 +11,18 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
-  const navItems = [
+  const mainNavItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
+    { icon: Pill, label: "Medicamentos", path: "/dashboard", module: "medicamentos" },
+    { icon: ShoppingBag, label: "Produtos", path: "/dashboard", module: "produtos" },
+    { icon: UtensilsCrossed, label: "Restaurantes", path: "/dashboard", module: "restaurantes" },
+    { icon: Apple, label: "Nutrição", path: "/dashboard", module: "nutricao" },
+  ];
+
+  const secondaryNavItems = [
     { icon: User, label: "Meu Perfil", path: "/profile" },
     { icon: Settings, label: "Configurações", path: "/settings" },
+    { icon: Lightbulb, label: "Sugestões", path: "/settings", module: "sugestoes" },
   ];
 
   useEffect(() => {
@@ -50,14 +58,38 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-6">
+      <nav className="flex-1 p-6 overflow-y-auto">
         <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-              (item.path === "/dashboard" && location.pathname === "/");
+          {mainNavItems.map((item) => {
+            const isActive = location.pathname === item.path && !item.module;
             
             return (
-              <li key={item.path}>
+              <li key={item.label}>
+                <NavLink
+                  to={item.path}
+                  onClick={isDrawer ? onClose : undefined}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    isActive
+                      ? "sidebar-link-active"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="my-4 border-t border-sidebar-border" />
+
+        <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
+          {secondaryNavItems.map((item) => {
+            const isActive = location.pathname === item.path && !item.module;
+            
+            return (
+              <li key={item.label}>
                 <NavLink
                   to={item.path}
                   onClick={isDrawer ? onClose : undefined}
