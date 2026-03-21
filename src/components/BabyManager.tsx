@@ -218,7 +218,7 @@ const BabyManager = () => {
         </div>
 
         {babies.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">Você ainda não adicionou nenhum bebê.</p>
+          <p className="text-sm text-muted-foreground text-center py-4">Você ainda não adicionou nenhum filho(a).</p>
         )}
       </CardContent>
     </Card>
