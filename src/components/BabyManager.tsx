@@ -89,7 +89,7 @@ const BabyManager = () => {
     if (error) {
       toast({
         title: "Erro ao adicionar",
-        description: "Não foi possível adicionar o bebê. Tente novamente.",
+        description: "Não foi possível adicionar o filho(a). Tente novamente.",
         variant: "destructive",
       });
     } else {
@@ -213,7 +213,7 @@ const BabyManager = () => {
             className="btn-primary mt-4 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            {adding ? "Adicionando..." : "Adicionar Bebê"}
+            {adding ? "Adicionando..." : "Adicionar Filho(a)"}
           </Button>
         </div>
 
