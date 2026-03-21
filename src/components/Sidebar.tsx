@@ -1,4 +1,4 @@
-import { Home, User, Settings, LogOut } from "lucide-react";
+import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, User, Settings, Lightbulb, LogOut } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -11,10 +11,18 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
-  const navItems = [
+  const mainNavItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
+    { icon: Pill, label: "Medicamentos", path: "/dashboard", module: "medicamentos" },
+    { icon: ShoppingBag, label: "Produtos", path: "/dashboard", module: "produtos" },
+    { icon: UtensilsCrossed, label: "Restaurantes", path: "/dashboard", module: "restaurantes" },
+    { icon: Apple, label: "Nutrição", path: "/dashboard", module: "nutricao" },
+  ];
+
+  const secondaryNavItems = [
     { icon: User, label: "Meu Perfil", path: "/profile" },
     { icon: Settings, label: "Configurações", path: "/settings" },
+    { icon: Lightbulb, label: "Sugestões", path: "/settings", module: "sugestoes" },
   ];
 
   useEffect(() => {
