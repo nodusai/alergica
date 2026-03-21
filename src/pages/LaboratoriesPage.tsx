@@ -25,7 +25,7 @@ type Lab = {
 };
 
 const LaboratoriesPage = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [labs, setLabs] = useState<Lab[]>([]);
   const [loading, setLoading] = useState(true);
