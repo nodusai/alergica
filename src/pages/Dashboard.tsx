@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Search, Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
@@ -54,11 +54,24 @@ const PlaceholderModule = ({ label }: { label: string }) => (
 );
 
 const Dashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userProfileType, setUserProfileType] = useState<string | null>(null);
   const [userName, setUserName] = useState("Mamãe");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeModule, setActiveModule] = useState<ModuleTab>("inicio");
+  const [activeModule, setActiveModule] = useState<ModuleTab>(
+    (searchParams.get("module") as ModuleTab) || "inicio"
+  );
+
+  // Sync activeModule when URL search params change (e.g. sidebar click)
+  useEffect(() => {
+    const mod = searchParams.get("module") as ModuleTab | null;
+    if (mod && mod !== activeModule) {
+      setActiveModule(mod);
+    } else if (!mod && activeModule !== "inicio") {
+      setActiveModule("inicio");
+    }
+  }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MedRow[]>([]);
   const [popularMedications, setPopularMedications] = useState<MedRow[]>([]);
