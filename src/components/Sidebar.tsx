@@ -7,7 +7,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: () => void }) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
