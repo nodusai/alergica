@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   User, Mail, Phone, AlertTriangle, FileText, Search,
-  ShoppingCart, Pill, Menu, Calendar, MapPin, Briefcase,
+  Pill, Menu, Calendar, MapPin, Briefcase,
   BadgeCheck, Pencil, X,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";

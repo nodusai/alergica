@@ -12,6 +12,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
   
   const navItems = [
+    { icon: Home, label: "Início", path: "/dashboard" },
     { icon: User, label: "Meu Perfil", path: "/profile" },
     { icon: Settings, label: "Configurações", path: "/settings" },
   ];
