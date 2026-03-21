@@ -176,7 +176,7 @@ const BabyManager = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="baby_name" className="text-foreground">
-                Nome do Bebê
+                Nome do Filho(a)
               </Label>
               <div className="relative">
                 <Baby className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -184,7 +184,7 @@ const BabyManager = () => {
                   id="baby_name"
                   value={newBabyName}
                   onChange={(e) => setNewBabyName(e.target.value)}
-                  placeholder="Nome do bebê"
+                  placeholder="Nome do filho(a)"
                   className="input-soft pl-12"
                 />
               </div>
