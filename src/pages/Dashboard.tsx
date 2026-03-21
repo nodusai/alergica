@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Search, Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import MedicationCard from "@/components/MedicationCard";
