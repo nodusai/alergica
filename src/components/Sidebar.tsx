@@ -1,4 +1,4 @@
-import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, User, Settings, Lightbulb, LogOut } from "lucide-react";
+import { Home, Pill, ShoppingBag, UtensilsCrossed, Apple, FlaskConical, User, Settings, Lightbulb, LogOut } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -13,10 +13,11 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   
   const mainNavItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
-    { icon: Pill, label: "Medicamentos", path: "/dashboard", module: "medicamentos" },
+    { icon: Pill, label: "Remédios", path: "/dashboard", module: "medicamentos" },
     { icon: ShoppingBag, label: "Produtos", path: "/dashboard", module: "produtos" },
     { icon: UtensilsCrossed, label: "Restaurantes", path: "/dashboard", module: "restaurantes" },
     { icon: Apple, label: "Nutrição", path: "/dashboard", module: "nutricao" },
+    { icon: FlaskConical, label: "Laboratórios", path: "/laboratories" },
   ];
 
   const secondaryNavItems = [
@@ -61,8 +62,9 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       <nav className="flex-1 p-6 overflow-y-auto">
         <ul className={isDrawer ? 'space-y-4' : 'space-y-2'}>
           {mainNavItems.map((item) => {
-            const isActive = location.pathname === item.path && 
-              (item.module ? new URLSearchParams(location.search).get("module") === item.module : !new URLSearchParams(location.search).get("module"));
+            const isActive = item.module
+              ? location.pathname === item.path && new URLSearchParams(location.search).get("module") === item.module
+              : location.pathname === item.path;
             
             return (
               <li key={item.label}>
