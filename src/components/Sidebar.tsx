@@ -13,10 +13,11 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   
   const mainNavItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
-    { icon: Pill, label: "Medicamentos", path: "/dashboard", module: "medicamentos" },
+    { icon: Pill, label: "Remédios", path: "/dashboard", module: "medicamentos" },
     { icon: ShoppingBag, label: "Produtos", path: "/dashboard", module: "produtos" },
     { icon: UtensilsCrossed, label: "Restaurantes", path: "/dashboard", module: "restaurantes" },
     { icon: Apple, label: "Nutrição", path: "/dashboard", module: "nutricao" },
+    { icon: FlaskConical, label: "Laboratórios", path: "/laboratories" },
   ];
 
   const secondaryNavItems = [
