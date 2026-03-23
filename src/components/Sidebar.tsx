@@ -10,7 +10,9 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ full_name: string | null; child_name: string | null } | null>(null);
-  
+
+  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || "Usuário";
+
   const mainNavItems = [
     { icon: Home, label: "Início", path: "/dashboard" },
     { icon: Pill, label: "Remédios", path: "/dashboard", module: "medicamentos" },
@@ -122,7 +124,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
             </div>
             <div>
               <p className="text-sm font-semibold text-sidebar-foreground">
-                {profile?.full_name || "Usuário"}
+                {displayFullName}
               </p>
               <p className="text-xs text-muted-foreground">
                 {profile?.child_name ? `Mãe de ${profile.child_name}` : "AlerGica"}
