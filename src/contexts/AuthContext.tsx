@@ -14,30 +14,83 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const isSessionRecoveryError = (message?: string) => {
+  const normalizedMessage = message?.toLowerCase() ?? "";
+
+  return [
+    "invalid refresh token",
+    "refresh token not found",
+    "jwt expired",
+    "session not found",
+  ].some((term) => normalizedMessage.includes(term));
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const clearSessionState = () => {
+    setSession(null);
+    setUser(null);
+    setIsAdmin(false);
+  };
+
+  const applySessionState = (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+
+    if (!nextSession) {
+      setIsAdmin(false);
+    }
+  };
+
+  const clearLocalSession = async () => {
+    await supabase.auth.signOut({ scope: "local" });
+    clearSessionState();
+  };
+
   useEffect(() => {
+    let isMounted = true;
+
+    const syncSession = (nextSession: Session | null) => {
+      if (!isMounted) return;
+
+      applySessionState(nextSession);
+      setLoading(false);
+    };
+
+    const recoverInvalidSession = async () => {
+      await clearLocalSession();
+
+      if (!isMounted) return;
+      setLoading(false);
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+      (_event, nextSession) => {
+        syncSession(nextSession);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error && isSessionRecoveryError(error.message)) {
+        await recoverInvalidSession();
+        return;
+      }
+
+      syncSession(session);
+    }).catch(async () => {
+      await recoverInvalidSession();
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -79,7 +132,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+
+    if (error && !isSessionRecoveryError(error.message)) {
+      throw error;
+    }
+
+    if (error) {
+      await clearLocalSession();
+      return;
+    }
+
+    clearSessionState();
   };
 
   return (
