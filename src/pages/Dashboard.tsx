@@ -57,7 +57,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userProfileType, setUserProfileType] = useState<string | null>(null);
-  const [userName, setUserName] = useState("Mamãe");
+  const [userName, setUserName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleTab>(
     (searchParams.get("module") as ModuleTab) || "inicio"
@@ -114,6 +114,7 @@ const Dashboard = () => {
       if (profileRes.data?.profile_type) setUserProfileType(profileRes.data.profile_type);
       if (!onboardingRes.data) setShowOnboarding(true);
       if (profileRes.data?.full_name) setUserName(profileRes.data.full_name.split(" ")[0]);
+      else if (user?.user_metadata?.full_name) setUserName(user.user_metadata.full_name.split(" ")[0]);
       setPopularMedications(popular);
       setLoadingPopular(false);
     };
@@ -203,7 +204,7 @@ const Dashboard = () => {
                   <Menu className="w-5 h-5 text-foreground" />
                 </button>
                 <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground text-center pr-2 mr-2 flex-1">
-                  Olá, {userName}! 👋
+                  Olá, {userName || "Usuário"}! 👋
                 </h2>
               </div>
 
