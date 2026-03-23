@@ -498,12 +498,10 @@ const ProfilePage = () => {
               </CardContent>
             </Card>
 
-            {/* Baby Manager — apenas para Mãe ou Pai */}
-            {isParent && (
-              <div className="mt-6 animate-fade-in" style={{ animationDelay: "0.3s" }}>
-                <BabyManager />
-              </div>
-            )}
+            {/* Meus Filhos(as) */}
+            <div className="mt-6 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              <BabyManager />
+            </div>
 
           </div>
         </div>
