@@ -187,6 +187,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          allergy_info: string | null
           avatar_url: string | null
           birth_date: string | null
           child_name: string | null
@@ -195,6 +196,8 @@ export type Database = {
           full_name: string | null
           gender: string | null
           id: string
+          observation: string | null
+          phone: string | null
           profession: string | null
           profile_type: string | null
           state: string | null
@@ -202,6 +205,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allergy_info?: string | null
           avatar_url?: string | null
           birth_date?: string | null
           child_name?: string | null
@@ -210,6 +214,8 @@ export type Database = {
           full_name?: string | null
           gender?: string | null
           id?: string
+          observation?: string | null
+          phone?: string | null
           profession?: string | null
           profile_type?: string | null
           state?: string | null
@@ -217,6 +223,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allergy_info?: string | null
           avatar_url?: string | null
           birth_date?: string | null
           child_name?: string | null
@@ -225,6 +232,8 @@ export type Database = {
           full_name?: string | null
           gender?: string | null
           id?: string
+          observation?: string | null
+          phone?: string | null
           profession?: string | null
           profile_type?: string | null
           state?: string | null
