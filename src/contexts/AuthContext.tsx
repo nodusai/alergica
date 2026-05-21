@@ -68,9 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     };
 
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST, but let getSession decide the first ready state
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      (event, nextSession) => {
+        if (event === "INITIAL_SESSION") return;
         syncSession(nextSession);
       }
     );
@@ -124,10 +125,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    if (!error) {
+      applySessionState(data.session);
+    }
+
     return { error };
   };
 
