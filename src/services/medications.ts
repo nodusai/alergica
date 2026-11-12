@@ -81,30 +81,57 @@ export const getRecentMedications = async (limit = 10): Promise<MedRow[]> => {
   return data ?? [];
 };
 
+/** Quantidade de remédios por página no módulo Remédios */
+export const MEDS_PAGE_SIZE = 30;
+
+/** Uma página do catálogo em ordem alfabética, com o total de registros. */
+export const getMedicationsPage = async (
+  page: number,
+  pageSize = MEDS_PAGE_SIZE,
+): Promise<{ items: MedRow[]; total: number }> => {
+  const from = (page - 1) * pageSize;
+  const { data, error, count } = await supabase
+    .from("medications")
+    .select(LIST_SELECT, { count: "exact" })
+    .order("nome_principal", { ascending: true })
+    // desempate estável: nomes repetidos não "pulam" entre páginas
+    .order("id", { ascending: true })
+    .range(from, from + pageSize - 1);
+  if (error) throw error;
+  return { items: data ?? [], total: count ?? 0 };
+};
+
+/** O PostgREST devolve no máximo 1000 linhas por chamada; busca em lotes até acabar. */
+const FETCH_BATCH = 1000;
+
 export const getMedicationsByRisk = async (
   risk: "safe" | "caution" | "risk"
 ): Promise<MedRow[]> => {
-  let query = supabase
-    .from("medications")
-    .select(LIST_SELECT)
-    .order("nome_principal", { ascending: true });
+  const buildQuery = () => {
+    const query = supabase
+      .from("medications")
+      .select(LIST_SELECT)
+      .order("nome_principal", { ascending: true })
+      .order("id", { ascending: true });
 
-  if (risk === "safe") {
-    query = query.eq("tem_risco_aplv", false);
-  } else if (risk === "risk") {
-    query = query.eq("tem_risco_aplv", true);
-  } else {
+    if (risk === "safe") return query.eq("tem_risco_aplv", false);
+    if (risk === "risk") return query.eq("tem_risco_aplv", true);
     // caution: "AMARELO" é o valor real no banco para atenção;
     // também captura via avisos (🟡/ATENÇÃO) e nivel_alerta com palavras-chave
-    query = query.or(
+    return query.or(
       "nivel_alerta.ilike.%amarelo%,nivel_alerta.ilike.%aten%,nivel_alerta.ilike.%cuidado%,avisos.ilike.%aten%,avisos.ilike.%🟡%,tem_risco_aplv.is.null"
     );
-  }
+  };
 
-  const { data, error } = await query;
-  if (error) throw error;
+  const rows: MedRow[] = [];
+  for (let from = 0; ; from += FETCH_BATCH) {
+    const { data, error } = await buildQuery().range(from, from + FETCH_BATCH - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < FETCH_BATCH) break;
+  }
   // Refinamento client-side para garantir precisão (o avisos pode mudar a classificação)
-  return (data ?? []).filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === risk);
+  return rows.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === risk);
 };
 
 export const searchMedications = async (q: string, limit = 12): Promise<MedRow[]> => {

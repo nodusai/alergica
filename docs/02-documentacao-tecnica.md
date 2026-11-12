@@ -2,7 +2,7 @@
 titulo: Documentação Técnica do Sistema
 subtitulo: Referência para desenvolvimento, implantação e manutenção do AlerGica — ambiente, configuração, dicionário de dados, APIs, serviços e componentes.
 categoria: Documentação Técnica
-versao: 1.0.1
+versao: 1.1.0
 atualizado: 12 de novembro de 2026
 publico: Desenvolvedores e equipe de operação
 classificacao: Confidencial
@@ -345,9 +345,10 @@ Regra do projeto: **componentes não chamam APIs diretamente** — usam as funç
 | Função | Retorno | Descrição |
 |---|---|---|
 | `getPopularMedications()` | `MedRow[]` | 6 medicamentos com maior `access_count` |
-| `getRecentMedications(limit = 10)` | `MedRow[]` | Lista em ordem alfabética (módulo Remédios usa 50) |
-| `getMedicationsByRisk(risk)` | `MedRow[]` | Filtro por nível; pré-filtra no banco e confirma com `medToRisk` |
-| `searchMedications(q, limit = 12)` | `MedRow[]` | Busca `ILIKE` em `nome_principal`, `nome_alternativo` e `nome_completo` |
+| `getMedicationsPage(page, pageSize = MEDS_PAGE_SIZE)` | `{ items: MedRow[], total }` | Uma página do catálogo em ordem alfabética (desempate por `id`), com total via `count: "exact"`. Usada no filtro "Todos" do módulo Remédios |
+| `getRecentMedications(limit = 10)` | `MedRow[]` | Lista em ordem alfabética (sem uso na interface atual) |
+| `getMedicationsByRisk(risk)` | `MedRow[]` | Lista completa de um nível; pré-filtra no banco em lotes de 1000 linhas (limite do PostgREST) e confirma com `medToRisk` |
+| `searchMedications(q, limit = 12)` | `MedRow[]` | Busca `ILIKE` em `nome_principal`, `nome_alternativo` e `nome_completo`. O painel chama com `limit = 300`; o Início exibe os 12 primeiros |
 | `getMedication(id)` | `MedicationDetail` | Registro completo |
 | `getSafeAlternatives(med, limit = 6)` | `SafeAlternative[]` | Mesmos princípios ativos, sem leite, um por fabricante |
 | `recordMedicationView(id)` | `void` | Chama a RPC de contador; falhas são ignoradas |
@@ -355,7 +356,9 @@ Regra do projeto: **componentes não chamam APIs diretamente** — usam as funç
 | `parseTextField(raw)` | `string[]` | Normaliza campos JSON/texto em lista de strings |
 | `activeKeysOf(med)` | `string[]` | Chaves canônicas de princípios ativos |
 
-Tipos exportados: `MedRow` (campos de listagem), `MedicationDetail` (registro completo), `SafeAlternative`.
+Tipos e constantes exportados: `MedRow` (campos de listagem), `MedicationDetail` (registro completo), `SafeAlternative`, `MEDS_PAGE_SIZE` (30).
+
+**Paginação do módulo Remédios.** Com o filtro "Todos" e sem busca, a paginação é feita no banco (`range`), buscando só os 30 itens da página. Nos filtros Seguro/Atenção/Risco a classificação final depende de `medToRisk` (que lê `avisos`), então a lista filtrada é carregada uma vez e paginada no navegador; trocar de página não faz nova consulta. Resultados de busca também são paginados no navegador. Trocar filtro ou busca volta para a página 1.
 
 ### 7.2 Regra de classificação — `medToRisk`
 
@@ -447,6 +450,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 | `ExpandableTabs` | Menu inferior fixo com os módulos Início, Remédios, Produtos, Restaurantes, Nutrição |
 | `MedicationCard` | Card de medicamento com nome, fabricante e selo de risco |
 | `RiskBadge` | Selo colorido do nível de risco |
+| `PaginationBar` | Navegação entre páginas (Anterior, números com reticências, Próxima; no celular mostra "página / total") |
 | `APLVInfoCarousel` | Carrossel com 10 fichas educativas com fonte e estudos recentes traduzidos |
 | `OnboardingModal` | Boas-vindas e configuração do perfil de alergias com IA (pulada para profissionais de saúde) |
 | `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error` |
@@ -549,3 +553,4 @@ O gerador (`scripts/build-docs.mjs`) monta capa, sumário e diagramas Mermaid e 
 |---|---|---|
 | 1.0.0 | 12/11/2026 | Primeira versão completa da documentação técnica. |
 | 1.0.1 | 12/11/2026 | `create-admin-user` restrita a administradores (seção 8.2); tratamento de erro do scanner (seções 8.4 e 9). |
+| 1.1.0 | 12/11/2026 | Paginação de 30 itens no módulo Remédios: `getMedicationsPage`, `MEDS_PAGE_SIZE`, busca em lotes em `getMedicationsByRisk` e componente `PaginationBar` (seções 7.1 e 9). |

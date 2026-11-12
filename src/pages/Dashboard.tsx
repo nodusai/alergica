@@ -11,12 +11,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPopularMedications,
-  getRecentMedications,
+  getMedicationsPage,
   getMedicationsByRisk,
   searchMedications,
   medToRisk,
   MedRow,
+  MEDS_PAGE_SIZE,
 } from "@/services/medications";
+import PaginationBar from "@/components/PaginationBar";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductScanner from "@/components/ProductScanner";
@@ -71,9 +73,14 @@ const Dashboard = () => {
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [searching, setSearching] = useState(false);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "all">("all");
+  // Módulo Remédios: em "Todos" guarda só a página atual (paginação no banco);
+  // nos filtros de risco guarda a lista filtrada inteira (paginação no navegador).
   const [medTabMeds, setMedTabMeds] = useState<MedRow[]>([]);
+  const [medTotal, setMedTotal] = useState(0);
+  const [medPage, setMedPage] = useState(1);
   const [loadingMedTab, setLoadingMedTab] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const medListTop = useRef<HTMLDivElement | null>(null);
 
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -114,7 +121,8 @@ const Dashboard = () => {
     setSearching(true);
     searchDebounce.current = setTimeout(async () => {
       const q = searchQuery.trim();
-      const data = await searchMedications(q).catch(() => [] as MedRow[]);
+      // Limite maior: no módulo Remédios os resultados são paginados de 30 em 30
+      const data = await searchMedications(q, 300).catch(() => [] as MedRow[]);
       setSearchResults(data);
       setSearching(false);
     }, 400);
@@ -124,19 +132,57 @@ const Dashboard = () => {
     };
   }, [searchQuery]);
 
+  // "Todos": busca no banco só a página atual
   useEffect(() => {
-    if (activeModule !== "medicamentos") return;
+    if (activeModule !== "medicamentos" || riskFilter !== "all") return;
+    let cancelled = false;
+    setLoadingMedTab(true);
+    getMedicationsPage(medPage)
+      .then(({ items, total }) => {
+        if (cancelled) return;
+        setMedTabMeds(items);
+        setMedTotal(total);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoadingMedTab(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModule, riskFilter, medPage]);
+
+  // Filtros de risco: carrega a lista filtrada uma vez; trocar de página não busca de novo
+  useEffect(() => {
+    if (activeModule !== "medicamentos" || riskFilter === "all") return;
+    let cancelled = false;
     setLoadingMedTab(true);
     setMedTabMeds([]);
-    const loader =
-      riskFilter === "all"
-        ? getRecentMedications(50)
-        : getMedicationsByRisk(riskFilter);
-    loader
-      .then(setMedTabMeds)
+    getMedicationsByRisk(riskFilter)
+      .then((list) => {
+        if (cancelled) return;
+        setMedTabMeds(list);
+        setMedTotal(list.length);
+      })
       .catch(() => {})
-      .finally(() => setLoadingMedTab(false));
+      .finally(() => !cancelled && setLoadingMedTab(false));
+    return () => {
+      cancelled = true;
+    };
   }, [activeModule, riskFilter]);
+
+  const changeMedPage = (page: number) => {
+    setMedPage(page);
+    medListTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const changeRiskFilter = (value: RiskLevel | "all") => {
+    if (value === riskFilter) return;
+    // Limpa a lista anterior já no clique, para não mostrar por um instante dados do filtro antigo
+    setMedTabMeds([]);
+    setMedTotal(0);
+    setLoadingMedTab(true);
+    setRiskFilter(value);
+    setMedPage(1);
+  };
 
   const handleOnboardingComplete = async () => {
     if (user) await supabase.from("user_onboarding").insert({ user_id: user.id });
@@ -148,7 +194,8 @@ const Dashboard = () => {
       ? searchResults
       : searchResults.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
 
-  const displayMeds = searchQuery.trim() ? filteredSearchResults : popularMedications;
+  // Início mostra no máximo 12 resultados de busca; a lista completa fica no módulo Remédios
+  const displayMeds = searchQuery.trim() ? filteredSearchResults.slice(0, 12) : popularMedications;
   const sectionTitle = searchQuery.trim() ? "Resultados da Busca" : "Mais Procurados";
 
   if (loading) {
@@ -205,7 +252,10 @@ const Dashboard = () => {
                     <input
                       type="search"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setMedPage(1);
+                      }}
                       aria-label="Buscar medicamento"
                       placeholder={
                         activeModule === "medicamentos"
@@ -277,18 +327,27 @@ const Dashboard = () => {
 
             {/* Medicamentos module */}
             {activeModule === "medicamentos" && (() => {
-              // Se há busca ativa, filtra client-side nos resultados da busca
-              // Sem busca, medTabMeds já vem filtrado do servidor
-              const filteredMeds = searchQuery.trim() ? filteredSearchResults : medTabMeds;
-              const isLoading = searchQuery.trim() ? searching : loadingMedTab;
+              // Busca ativa: pagina os resultados da busca no navegador.
+              // "Todos" sem busca: medTabMeds já é a página atual vinda do banco.
+              // Filtro de risco sem busca: medTabMeds é a lista filtrada inteira.
+              const hasQuery = !!searchQuery.trim();
+              const serverPaged = !hasQuery && riskFilter === "all";
+              const source = hasQuery ? filteredSearchResults : medTabMeds;
+              const total = hasQuery ? filteredSearchResults.length : medTotal;
+              const totalPages = Math.max(1, Math.ceil(total / MEDS_PAGE_SIZE));
+              const page = Math.min(medPage, totalPages);
+              const pageStart = (page - 1) * MEDS_PAGE_SIZE;
+              const filteredMeds = serverPaged ? source : source.slice(pageStart, pageStart + MEDS_PAGE_SIZE);
+              const isLoading = hasQuery ? searching : loadingMedTab;
+              const fmt = (n: number) => n.toLocaleString("pt-BR");
 
               return (
                 <section className="animate-fade-in">
-                  <div className="flex gap-2 flex-wrap mb-4">
+                  <div ref={medListTop} className="scroll-mt-6 flex gap-2 flex-wrap mb-4">
                     {RISK_FILTER_LABELS.map((f) => (
                       <button
                         key={f.value}
-                        onClick={() => setRiskFilter(f.value)}
+                        onClick={() => changeRiskFilter(f.value)}
                         aria-pressed={riskFilter === f.value}
                         className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           riskFilter === f.value
@@ -300,9 +359,16 @@ const Dashboard = () => {
                       </button>
                     ))}
                   </div>
+                  <p className="text-sm text-muted-foreground mb-4 tabular-nums" aria-live="polite">
+                    {isLoading
+                      ? "Carregando remédios..."
+                      : total === 0
+                        ? " "
+                        : `Mostrando ${fmt(pageStart + 1)}–${fmt(Math.min(pageStart + MEDS_PAGE_SIZE, total))} de ${fmt(total)} ${total === 1 ? "remédio" : "remédios"}`}
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => <MedCardSkeleton key={i} />)
+                      ? Array.from({ length: 9 }).map((_, i) => <MedCardSkeleton key={i} />)
                       : filteredMeds.map((med, index) => (
                           <Link
                             to={`/medication/${med.id}`}
@@ -326,6 +392,7 @@ const Dashboard = () => {
                       </p>
                     )}
                   </div>
+                  {!isLoading && <PaginationBar page={page} totalPages={totalPages} onChange={changeMedPage} />}
                 </section>
               );
             })()}

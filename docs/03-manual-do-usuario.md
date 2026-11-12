@@ -2,7 +2,7 @@
 titulo: Manual do Usuário
 subtitulo: Guia completo para usar o AlerGica no dia a dia — da criação da conta à consulta de medicamentos e produtos seguros para quem tem APLV.
 categoria: Manual do Usuário
-versao: 1.0.1
+versao: 1.1.0
 atualizado: 12 de novembro de 2026
 publico: Famílias, pessoas alérgicas e profissionais de saúde
 classificacao: Uso público
@@ -150,6 +150,9 @@ No menu inferior, toque em **Remédios** para navegar pelo catálogo.
 
 - Use os filtros **Todos**, **Seguro**, **Atenção** e **Risco** para ver só uma classificação.
 - A busca no topo também funciona aqui e respeita o filtro escolhido.
+- Os remédios aparecem em ordem alfabética, **30 por página**. Acima da lista você vê quantos foram encontrados (ex.: *Mostrando 31–60 de 1.245 remédios*).
+- No fim da lista, use **Anterior**, **Próxima** ou o número da página para navegar. No celular aparece a página atual (ex.: *2 / 42*) entre as setas.
+- Ao trocar o filtro ou digitar uma busca, a lista volta para a primeira página.
 - Toque em qualquer remédio para abrir os detalhes.
 
 ## 11. Verificar produtos pelo rótulo
@@ -266,3 +269,4 @@ Sim. Basta entrar com o mesmo e-mail e senha.
 |---|---|---|
 | 1.0.0 | 12/11/2026 | Primeira versão do manual do usuário. |
 | 1.0.1 | 12/11/2026 | Novo aviso "Não foi possível analisar" no módulo Produtos. |
+| 1.1.0 | 12/11/2026 | Módulo Remédios com paginação de 30 itens por página e contador de resultados. |
