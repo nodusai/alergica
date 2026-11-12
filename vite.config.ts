@@ -2,16 +2,19 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 // https://vitejs.dev/config/
-// Public backend values (safe to ship in the browser) used as a fallback when the
-// build environment has no .env, so the published app never starts without them.
-const FALLBACK_URL = "https://hxfzsqezrxsoecctemve.supabase.co";
-const FALLBACK_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4ZnpzcWV6cnhzb2VjY3RlbXZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzQ3NDQsImV4cCI6MjA4ODI1MDc0NH0.yzm0HOuAG1rjEWkRW5cJ-iG_xYlObF5IWBT3IrhbHCU";
+// Banco oficial do AlerGica (projeto yigfbx…). Valores PÚBLICOS (chave publishable),
+// usados quando o build não tem .env (ex.: site publicado pelo Lovable).
+const FALLBACK_URL = "https://yigfbxctogqohmnjjglo.supabase.co";
+const FALLBACK_KEY = "sb_publishable_zcd7TPtbBpAwMe6bEIrH4A_FePbzITZ";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const url = env.VITE_SUPABASE_URL || FALLBACK_URL;
-  const key = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_KEY;
+  const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
+  // Tudo que vai para o navegador é público: chave secreta aqui daria acesso total ao banco
+  if (/^sb_secret_|service_role/.test(key)) {
+    throw new Error("Chave SECRETA do Supabase em variável VITE_: use a chave publishable (sb_publishable_…).");
+  }
   return {
   define: {
     "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(url),
@@ -37,6 +40,11 @@ export default defineConfig(({ mode }) => {
     },
   },
   plugins: [react()],
+  // tesseract.js é importado sob demanda (leitura de rótulos); pré-otimizar evita
+  // o erro "Failed to fetch dynamically imported module" na primeira análise em dev
+  optimizeDeps: {
+    include: ["tesseract.js"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

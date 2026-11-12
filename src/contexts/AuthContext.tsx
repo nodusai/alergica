@@ -7,7 +7,14 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  /** A checagem do papel de administrador ainda não terminou */
+  roleLoading: boolean;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata?: Record<string, unknown>,
+  ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -19,6 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Para qual usuário o papel já foi checado (evita um instante com isAdmin=false logo após o login)
+  const [roleCheckedFor, setRoleCheckedFor] = useState<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -44,17 +53,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkAdminRole = async () => {
       if (user) {
         const { data, error } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
-        if (!error) {
-          setIsAdmin(data);
-        }
+        setIsAdmin(!error && data === true);
       } else {
         setIsAdmin(false);
       }
+      setRoleCheckedFor(user?.id ?? null);
     };
     checkAdminRole();
   }, [user]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata: Record<string, unknown> = {},
+  ) => {
     // const redirectUrl = `${window.location.origin}/dashboard`;
 
     const { error } = await supabase.auth.signUp({
@@ -64,6 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // emailRedirectTo: redirectUrl, // Desabilitado: login automático após cadastro
         data: {
           full_name: fullName,
+          // ex.: lgpd_consents — registro dos consentimentos dados no cadastro
+          ...extraMetadata,
         },
       },
     });
@@ -83,7 +98,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, isAdmin, roleLoading: loading || (!!user && roleCheckedFor !== user.id), signUp, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -28,6 +28,12 @@
 - `user_onboarding`, `user_roles` — auth/access control
 - Migrations: `supabase/migrations/` — add a new SQL file per schema change
 
+## Documentation (always keep in sync)
+- System docs live in `docs/` (Brazilian Portuguese): `01-arquitetura.md`, `02-documentacao-tecnica.md`, `03-manual-do-usuario.md`, with PDFs in `docs/pdf/`.
+- **Every change to the system must update the affected docs in the same commit** — new screens/flows/user-facing text → manual; tables/columns/functions/policies → técnica §6 + arquitetura §8; services/endpoints/integrations → técnica §7–8 + arquitetura §6–7; risk/alternatives rules → arquitetura §9 + técnica §7; fixed tech-debt item → arquitetura §13.
+- Bump `versao`/`atualizado` in the front-matter and add a row to the doc's "Histórico de revisões".
+- Then regenerate PDFs with `npm run docs:pdf` and commit `.md` + `.pdf` together.
+
 ## Backend Rules (Python/FastAPI)
 - Use FastAPI with Pydantic v2 schemas
 - Connect to Supabase PostgreSQL via `supabase-py`

@@ -3,6 +3,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sparkles, Loader2, CheckCircle, Edit2, RotateCcw, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { USER_ALLERGIES_KEY } from "@/hooks/use-user-allergies";
 import mascotImage from "@/assets/mascot.png";
 
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
@@ -20,6 +22,7 @@ interface OnboardingModalProps {
 const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps) => {
   const isHealthProfessional = !!profileType && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("welcome");
   const [allergyInput, setAllergyInput] = useState("");
   const [aiResult, setAiResult] = useState("");
@@ -70,6 +73,7 @@ const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps
       await supabase
         .from("profiles")
         .upsert({ user_id: user.id, allergy_info: data }, { onConflict: "user_id" });
+      queryClient.invalidateQueries({ queryKey: [USER_ALLERGIES_KEY] });
     }
     setSaving(false);
     onComplete();
@@ -161,6 +165,14 @@ const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps
             {error && (
               <p className="text-sm text-destructive mt-2">{error}</p>
             )}
+
+            <p className="text-xs text-muted-foreground leading-relaxed mt-3">
+              🔒 O texto é enviado ao nosso assistente de IA só para organizar seu perfil de alergias, conforme a{" "}
+              <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+                Política de Privacidade
+              </a>
+              .
+            </p>
 
             <button
               onClick={handleConfigureProfile}

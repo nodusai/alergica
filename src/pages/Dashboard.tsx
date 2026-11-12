@@ -11,24 +11,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPopularMedications,
-  getRecentMedications,
+  getMedicationsPage,
   getMedicationsByRisk,
   searchMedications,
-  medToRisk,
   MedRow,
+  MEDS_PAGE_SIZE,
 } from "@/services/medications";
+import PaginationBar from "@/components/PaginationBar";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductScanner from "@/components/ProductScanner";
+import { displayName, firstName } from "@/lib/names";
+import { useUserAllergies } from "@/hooks/use-user-allergies";
+import { assessMedication, assessmentBadge } from "@/lib/medicationRisk";
 
 
 type RiskLevel = "safe" | "caution" | "risk";
 
-const RISK_TEXT: Record<string, string> = {
-  safe: "Seguro (Sem Leite)",
-  caution: "Atenção (Verificar)",
-  risk: "Risco (Contém Leite)",
-};
 
 const RISK_FILTER_LABELS: { value: RiskLevel | "all"; label: string }[] = [
   { value: "all", label: "Todos" },
@@ -36,6 +35,15 @@ const RISK_FILTER_LABELS: { value: RiskLevel | "all"; label: string }[] = [
   { value: "caution", label: "Atenção" },
   { value: "risk", label: "Risco" },
 ];
+
+const MODULE_HEADERS: Partial<Record<ModuleTab, { title: string; subtitle: string }>> = {
+  produtos: {
+    title: "Verificar produto",
+    subtitle: "Fotografe a lista de ingredientes de um alimento e descubra se ele tem leite ou derivados.",
+  },
+  restaurantes: { title: "Restaurantes", subtitle: "Lugares com opções seguras para quem tem APLV." },
+  nutricao: { title: "Nutrição", subtitle: "Orientações e receitas sem leite para o dia a dia." },
+};
 
 const MED_LINK =
   "group block rounded-2xl active:scale-[0.98] transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -62,7 +70,7 @@ const PlaceholderModule = ({ label }: { label: string }) => (
 const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userProfileType, setUserProfileType] = useState<string | null>(null);
-  const [userName, setUserName] = useState("Mamãe");
+  const [userName, setUserName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleTab>("inicio");
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,12 +79,21 @@ const Dashboard = () => {
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [searching, setSearching] = useState(false);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "all">("all");
+  // Módulo Remédios: em "Todos" guarda só a página atual (paginação no banco);
+  // nos filtros de risco guarda a lista filtrada inteira (paginação no navegador).
   const [medTabMeds, setMedTabMeds] = useState<MedRow[]>([]);
+  const [medTotal, setMedTotal] = useState(0);
+  const [medPage, setMedPage] = useState(1);
   const [loadingMedTab, setLoadingMedTab] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const medListTop = useRef<HTMLDivElement | null>(null);
 
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  // Alergias do perfil: mesma regra de risco das listas e do detalhe do remédio
+  const { effective: allergies, personalized, loading: loadingAllergies } = useUserAllergies();
+  const allergyKey = allergies.groups.map((g) => g.id).concat(allergies.custom).join("|");
+  const assess = (m: MedRow) => assessMedication(m, allergies);
 
   useEffect(() => {
     if (!loading && !user) navigate("/");
@@ -94,7 +111,8 @@ const Dashboard = () => {
 
       if (profileRes.data?.profile_type) setUserProfileType(profileRes.data.profile_type);
       if (!onboardingRes.data) setShowOnboarding(true);
-      if (profileRes.data?.full_name) setUserName(profileRes.data.full_name.split(" ")[0]);
+      // Nome: perfil → cadastro → e-mail (nunca um nome genérico como "Mamãe")
+      setUserName(firstName(displayName(profileRes.data?.full_name, user)));
       setPopularMedications(popular);
       setLoadingPopular(false);
     };
@@ -114,7 +132,8 @@ const Dashboard = () => {
     setSearching(true);
     searchDebounce.current = setTimeout(async () => {
       const q = searchQuery.trim();
-      const data = await searchMedications(q).catch(() => [] as MedRow[]);
+      // Limite maior: no módulo Remédios os resultados são paginados de 30 em 30
+      const data = await searchMedications(q, 300).catch(() => [] as MedRow[]);
       setSearchResults(data);
       setSearching(false);
     }, 400);
@@ -124,19 +143,59 @@ const Dashboard = () => {
     };
   }, [searchQuery]);
 
+  // "Todos": busca no banco só a página atual
   useEffect(() => {
-    if (activeModule !== "medicamentos") return;
+    if (activeModule !== "medicamentos" || riskFilter !== "all") return;
+    let cancelled = false;
+    setLoadingMedTab(true);
+    getMedicationsPage(medPage)
+      .then(({ items, total }) => {
+        if (cancelled) return;
+        setMedTabMeds(items);
+        setMedTotal(total);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoadingMedTab(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModule, riskFilter, medPage]);
+
+  // Filtros de risco: carrega a lista filtrada uma vez; trocar de página não busca de novo
+  useEffect(() => {
+    if (activeModule !== "medicamentos" || riskFilter === "all" || loadingAllergies) return;
+    let cancelled = false;
     setLoadingMedTab(true);
     setMedTabMeds([]);
-    const loader =
-      riskFilter === "all"
-        ? getRecentMedications(50)
-        : getMedicationsByRisk(riskFilter);
-    loader
-      .then(setMedTabMeds)
+    getMedicationsByRisk(riskFilter, allergies, personalized)
+      .then((list) => {
+        if (cancelled) return;
+        setMedTabMeds(list);
+        setMedTotal(list.length);
+      })
       .catch(() => {})
-      .finally(() => setLoadingMedTab(false));
-  }, [activeModule, riskFilter]);
+      .finally(() => !cancelled && setLoadingMedTab(false));
+    return () => {
+      cancelled = true;
+    };
+    // allergyKey resume as alergias do perfil (o objeto muda a cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeModule, riskFilter, allergyKey, personalized, loadingAllergies]);
+
+  const changeMedPage = (page: number) => {
+    setMedPage(page);
+    medListTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const changeRiskFilter = (value: RiskLevel | "all") => {
+    if (value === riskFilter) return;
+    // Limpa a lista anterior já no clique, para não mostrar por um instante dados do filtro antigo
+    setMedTabMeds([]);
+    setMedTotal(0);
+    setLoadingMedTab(true);
+    setRiskFilter(value);
+    setMedPage(1);
+  };
 
   const handleOnboardingComplete = async () => {
     if (user) await supabase.from("user_onboarding").insert({ user_id: user.id });
@@ -146,9 +205,10 @@ const Dashboard = () => {
   const filteredSearchResults =
     riskFilter === "all"
       ? searchResults
-      : searchResults.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
+      : searchResults.filter((m) => assess(m).level === riskFilter);
 
-  const displayMeds = searchQuery.trim() ? filteredSearchResults : popularMedications;
+  // Início mostra no máximo 12 resultados de busca; a lista completa fica no módulo Remédios
+  const displayMeds = searchQuery.trim() ? filteredSearchResults.slice(0, 12) : popularMedications;
   const sectionTitle = searchQuery.trim() ? "Resultados da Busca" : "Mais Procurados";
 
   if (loading) {
@@ -192,7 +252,7 @@ const Dashboard = () => {
               {activeModule === "inicio" || activeModule === "medicamentos" ? (
                 <div className="relative overflow-hidden rounded-3xl border border-primary/15 px-5 py-6 md:px-8 md:py-8 bg-[radial-gradient(120%_120%_at_0%_0%,hsl(var(--primary)/0.16)_0%,transparent_55%),radial-gradient(90%_120%_at_100%_100%,hsl(var(--safe)/0.10)_0%,transparent_60%)] bg-card shadow-[0_1px_2px_hsl(var(--primary)/0.08),0_16px_40px_-20px_hsl(var(--primary)/0.45)]">
                   <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em] leading-tight">
-                    Olá, {userName}! 👋
+                    {userName ? `Olá, ${userName}!` : "Olá!"} 👋
                   </h2>
                   <p className="text-sm md:text-base text-muted-foreground mt-1.5 mb-5 md:mb-6 leading-relaxed max-w-xl">
                     {activeModule === "medicamentos"
@@ -205,7 +265,10 @@ const Dashboard = () => {
                     <input
                       type="search"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setMedPage(1);
+                      }}
                       aria-label="Buscar medicamento"
                       placeholder={
                         activeModule === "medicamentos"
@@ -226,9 +289,15 @@ const Dashboard = () => {
                   </ul>
                 </div>
               ) : (
-                <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em]">
-                  Olá, {userName}! 👋
-                </h2>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">{userName ? `Olá, ${userName}!` : "Olá!"} 👋</p>
+                  <h2 className="font-display text-[2rem] md:text-[2.4rem] font-bold text-foreground tracking-[-0.03em] leading-[1.1] mt-1">
+                    {MODULE_HEADERS[activeModule]?.title}
+                  </h2>
+                  <p className="text-[15px] text-muted-foreground mt-2 leading-relaxed max-w-2xl">
+                    {MODULE_HEADERS[activeModule]?.subtitle}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -260,8 +329,8 @@ const Dashboard = () => {
                             <MedicationCard
                               name={med.nome_principal}
                               laboratory={med.nome_alternativo ?? ""}
-                              riskLevel={medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)}
-                              riskText={RISK_TEXT[medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)] ?? med.nivel_alerta ?? ""}
+                              riskLevel={loadingAllergies ? "caution" : assess(med).level}
+                              riskText={loadingAllergies ? "Verificando…" : assessmentBadge(assess(med), personalized)}
                             />
                           </Link>
                         ))}
@@ -277,18 +346,27 @@ const Dashboard = () => {
 
             {/* Medicamentos module */}
             {activeModule === "medicamentos" && (() => {
-              // Se há busca ativa, filtra client-side nos resultados da busca
-              // Sem busca, medTabMeds já vem filtrado do servidor
-              const filteredMeds = searchQuery.trim() ? filteredSearchResults : medTabMeds;
-              const isLoading = searchQuery.trim() ? searching : loadingMedTab;
+              // Busca ativa: pagina os resultados da busca no navegador.
+              // "Todos" sem busca: medTabMeds já é a página atual vinda do banco.
+              // Filtro de risco sem busca: medTabMeds é a lista filtrada inteira.
+              const hasQuery = !!searchQuery.trim();
+              const serverPaged = !hasQuery && riskFilter === "all";
+              const source = hasQuery ? filteredSearchResults : medTabMeds;
+              const total = hasQuery ? filteredSearchResults.length : medTotal;
+              const totalPages = Math.max(1, Math.ceil(total / MEDS_PAGE_SIZE));
+              const page = Math.min(medPage, totalPages);
+              const pageStart = (page - 1) * MEDS_PAGE_SIZE;
+              const filteredMeds = serverPaged ? source : source.slice(pageStart, pageStart + MEDS_PAGE_SIZE);
+              const isLoading = hasQuery ? searching : loadingMedTab;
+              const fmt = (n: number) => n.toLocaleString("pt-BR");
 
               return (
                 <section className="animate-fade-in">
-                  <div className="flex gap-2 flex-wrap mb-4">
+                  <div ref={medListTop} className="scroll-mt-6 flex gap-2 flex-wrap mb-4">
                     {RISK_FILTER_LABELS.map((f) => (
                       <button
                         key={f.value}
-                        onClick={() => setRiskFilter(f.value)}
+                        onClick={() => changeRiskFilter(f.value)}
                         aria-pressed={riskFilter === f.value}
                         className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           riskFilter === f.value
@@ -300,9 +378,16 @@ const Dashboard = () => {
                       </button>
                     ))}
                   </div>
+                  <p className="text-sm text-muted-foreground mb-4 tabular-nums" aria-live="polite">
+                    {isLoading
+                      ? "Carregando remédios..."
+                      : total === 0
+                        ? " "
+                        : `Mostrando ${fmt(pageStart + 1)}–${fmt(Math.min(pageStart + MEDS_PAGE_SIZE, total))} de ${fmt(total)} ${total === 1 ? "remédio" : "remédios"}`}
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => <MedCardSkeleton key={i} />)
+                      ? Array.from({ length: 9 }).map((_, i) => <MedCardSkeleton key={i} />)
                       : filteredMeds.map((med, index) => (
                           <Link
                             to={`/medication/${med.id}`}
@@ -313,8 +398,8 @@ const Dashboard = () => {
                             <MedicationCard
                               name={med.nome_principal}
                               laboratory={med.nome_alternativo ?? ""}
-                              riskLevel={medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)}
-                              riskText={RISK_TEXT[medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)] ?? med.nivel_alerta ?? ""}
+                              riskLevel={loadingAllergies ? "caution" : assess(med).level}
+                              riskText={loadingAllergies ? "Verificando…" : assessmentBadge(assess(med), personalized)}
                             />
                           </Link>
                         ))}
@@ -326,6 +411,7 @@ const Dashboard = () => {
                       </p>
                     )}
                   </div>
+                  {!isLoading && <PaginationBar page={page} totalPages={totalPages} onChange={changeMedPage} />}
                 </section>
               );
             })()}

@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { AlertTriangle, Info, ListChecks, Lock, Milk, ScanLine, Sparkles, Sun, Upload, ZoomIn } from "lucide-react";
 
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
+import { analyzeLabel, type ScanOutcome } from "@/services/labelAnalysis";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useUserAllergies } from "@/hooks/use-user-allergies";
+import { effectiveAllergies, foodOnly, joinLabels, searchTermsFor } from "@/lib/allergens";
 
 // ─── ICONS ───────────────────────────────────────────────────────────────────
 const CameraIcon = () => (
@@ -51,23 +55,32 @@ const RetryIcon = () => (
 );
 
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
-type Stage = "idle" | "camera" | "preview" | "analyzing" | "result";
+type Stage = "idle" | "camera" | "preview" | "analyzing" | "result" | "error";
 
-interface ScanResult {
-  safe: boolean;
-  product?: string;
-  allergens?: string[];
-  details?: string;
-}
+
 
 // -─── COMPONENTE ──────────────────────────────────────────────────────────────
 export default function ProductScanner() {
   const [stage, setStage] = useState<Stage>("idle");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
+  // Alergias do perfil (sem nenhuma cadastrada: leite/APLV)
+  const { effective } = useUserAllergies();
+  // Rótulo de alimento: só alergias alimentares e termos próprios (remédios não entram)
+  const food = foodOnly(effective);
+  // Perfil só com alergias a remédios: o rótulo continua sendo verificado para leite (APLV)
+  const allergies = food.groups.length || food.custom.length ? food : effectiveAllergies(null);
+  const allergyLabels = searchTermsFor(allergies).map((g) => g.label);
+  const allergyList = joinLabels(allergyLabels.map((l) => l.toLowerCase().replace(" (aplv)", "")));
+  const [progress, setProgress] = useState<number | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [scanLine, setScanLine] = useState(0);
+  // De onde veio a foto atual: define se "tirar outra" abre a câmera ou a galeria
+  const [source, setSource] = useState<"camera" | "gallery">("camera");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -133,6 +146,7 @@ export default function ProductScanner() {
     canvas.getContext("2d")!.drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setCapturedImage(dataUrl);
+    setSource("camera");
     stopCamera();
     setStage("preview");
   }, [stopCamera]);
@@ -146,37 +160,61 @@ export default function ProductScanner() {
   const analyzeImage = useCallback(async () => {
     if (!capturedImage) return;
     setStage("analyzing");
+    setProgress(null);
     try {
-      const res = await fetch(capturedImage);
-      const blob = await res.blob();
-      const formData = new FormData();
-      formData.append("image", blob, "produto.jpg");
-
-      const response = await fetch(N8N_WEBHOOK_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Erro na análise");
-      const data: ScanResult = await response.json();
-      setResult(data);
-    } catch {
-      // Fallback de demonstração enquanto o webhook não retorna
-      setResult({
-        safe: false,
-        product: "Produto Analisado",
-        allergens: ["Leite", "Derivados de leite"],
-        details: "Foram detectados ingredientes que podem conter proteína do leite de vaca. Evite oferecer este produto ao seu filho.",
-      });
+      const blob = await (await fetch(capturedImage)).blob();
+      setOutcome(await analyzeLabel(blob, allergies, setProgress));
+      setStage("result");
+    } catch (err) {
+      console.error("Erro ao analisar produto:", err);
+      setOutcome(null);
+      setStage("error");
     }
-    setStage("result");
-  }, [capturedImage]);
+  }, [capturedImage, allergies]);
+
+  /** Foto escolhida da galeria (útil no computador, sem câmera traseira) */
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite escolher o mesmo arquivo de novo
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Escolha um arquivo de imagem (JPG ou PNG).");
+      setStage("idle");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("A imagem é muito grande. Escolha uma foto de até 10 MB.");
+      setStage("idle");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadError(null);
+      setCapturedImage(reader.result as string);
+      setSource("gallery");
+      setStage("preview");
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  /** Nova foto pelo mesmo caminho usado antes (câmera ou galeria) */
+  const retake = useCallback(() => {
+    setCapturedImage(null);
+    setOutcome(null);
+    if (source === "gallery") {
+      setStage("idle");
+      fileInputRef.current?.click();
+    } else {
+      startCamera();
+    }
+  }, [source, startCamera]);
 
   const reset = useCallback(() => {
     stopCamera();
     setCapturedImage(null);
-    setResult(null);
+    setOutcome(null);
     setPermissionDenied(false);
+    setUploadError(null);
     setStage("idle");
   }, [stopCamera]);
 
@@ -184,48 +222,109 @@ export default function ProductScanner() {
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col items-center justify-center py-4 animate-fade-in">
+    <div className="flex flex-col items-center justify-center animate-fade-in">
       <canvas ref={canvasRef} className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} aria-hidden tabIndex={-1} />
 
       {/* ── IDLE ── */}
       {stage === "idle" && (
-        <div className="card-soft w-full max-w-sm p-8 flex flex-col items-center gap-5 text-center">
-          {/* Ícone com pulse */}
-          <div className="relative w-20 h-20 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse" />
-            <div className="relative z-10 w-16 h-16 rounded-full bg-secondary border-2 border-primary/20 flex items-center justify-center">
-              <span className="text-3xl">🛒</span>
+        <div className="w-full grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6 items-start">
+          {/* Ação principal */}
+          <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-card p-6 md:p-8 bg-[radial-gradient(110%_90%_at_0%_0%,hsl(var(--primary)/0.16)_0%,transparent_55%),radial-gradient(80%_80%_at_100%_100%,hsl(40_95%_70%/0.14)_0%,transparent_60%)] shadow-[0_1px_2px_hsl(var(--primary)/0.08),0_16px_40px_-20px_hsl(var(--primary)/0.45)]">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[hsl(152_70%_62%)] to-[hsl(165_55%_40%)] text-white flex items-center justify-center shadow-[0_10px_24px_-10px_hsl(160_50%_30%/0.7)]">
+              <ScanLine className="w-8 h-8" />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground tracking-tight">Verificar Produto</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Fotografe a tabela de ingredientes de qualquer produto alimentício. Nossa IA verifica se há proteína do leite de vaca ou outros alérgenos cadastrados no perfil do seu filho.
+            <h3 className="mt-5 text-xl md:text-2xl font-extrabold tracking-[-0.02em] text-foreground">Fotografe o rótulo</h3>
+            <p className="mt-2 text-[15px] text-muted-foreground leading-relaxed">
+              Nossa IA lê a lista de ingredientes e os avisos de alergênicos e mostra se o produto tem algum alérgeno
+              do seu perfil.
             </p>
-          </div>
 
-          <div className="flex flex-wrap gap-2 justify-center">
-            {["📋 Ingredientes", "⚗️ Excipientes", "🏭 Fábrica"].map((t) => (
-              <span key={t} className="bg-secondary text-secondary-foreground rounded-full px-3 py-1 text-xs font-medium">
-                {t}
-              </span>
-            ))}
-          </div>
+            <ul className="mt-5 flex flex-wrap gap-2" aria-label="O que é verificado">
+              {[
+                ...allergyLabels.map((label) => ({ icon: label.startsWith("Leite") ? Milk : ListChecks, label })),
+                { icon: AlertTriangle, label: "Avisos de traços" },
+              ].map(({ icon: Icon, label }) => (
+                <li key={label} className="inline-flex items-center gap-1.5 rounded-full bg-card/80 border border-border/70 px-3 py-1.5 text-[13px] font-semibold text-foreground/80">
+                  <Icon className="w-3.5 h-3.5 text-[hsl(152_55%_32%)] dark:text-primary" /> {label}
+                </li>
+              ))}
+            </ul>
 
-          {permissionDenied && (
-            <div className="w-full bg-caution/10 border border-caution/40 rounded-xl p-3 text-xs text-caution-foreground text-left">
-              ⚠️ Acesso à câmera negado. Habilite nas configurações do navegador e tente novamente.
+            {(permissionDenied || uploadError) && (
+              <div role="alert" className="mt-5 rounded-xl border border-caution/40 bg-caution/10 px-4 py-3 text-sm text-caution-foreground leading-relaxed">
+                {uploadError ??
+                  "O acesso à câmera foi negado. Libere a câmera nas configurações do navegador ou envie uma foto da galeria."}
+              </div>
+            )}
+
+            <div className="mt-6 grid sm:grid-cols-2 gap-3">
+              <button onClick={() => startCamera()} className="btn-primary h-12 py-0 flex items-center justify-center gap-2">
+                <CameraIcon /> Abrir câmera
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="h-12 rounded-xl border-2 border-border bg-card text-[15px] font-bold text-foreground inline-flex items-center justify-center gap-2 hover:border-primary/60 hover:bg-secondary active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Upload className="w-[18px] h-[18px]" /> Enviar foto
+              </button>
             </div>
-          )}
 
-          <button
-            onClick={() => startCamera()}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
-            <CameraIcon />
-            Abrir Câmera
-          </button>
+            <p className="mt-5 flex gap-2 text-[13px] text-muted-foreground leading-relaxed">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                A foto é analisada pela nossa IA ou, se ela estiver indisponível, lida no próprio aparelho — só para
+                encontrar os ingredientes. Evite fotografar pessoas ou documentos.{" "}
+                <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+                  Saiba mais
+                </a>
+              </span>
+            </p>
+          </section>
+
+          {/* Como funciona + dicas */}
+          <aside className="space-y-4">
+            <section className="rounded-3xl bg-card border border-border/60 p-6 shadow-[0_1px_2px_hsl(var(--primary)/0.06),0_10px_28px_-14px_hsl(160_40%_15%/0.18)]">
+              <h3 className="text-base font-extrabold text-foreground">Como funciona</h3>
+              <ol className="mt-4 space-y-4">
+                {[
+                  { t: "Fotografe os ingredientes", d: "Enquadre só a lista de ingredientes e os avisos de alergênicos." },
+                  { t: "Confira a foto", d: "As letras precisam estar nítidas e legíveis." },
+                  { t: "Veja o resultado", d: "Seguro ou com alérgenos, com a lista do que foi encontrado." },
+                ].map((step, i) => (
+                  <li key={step.t} className="flex gap-3">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-primary/20 text-[13px] font-extrabold text-foreground flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="block text-[15px] font-bold text-foreground leading-snug">{step.t}</span>
+                      <span className="block text-sm text-muted-foreground leading-relaxed">{step.d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="rounded-3xl bg-secondary/60 border border-border/60 p-6">
+              <h3 className="text-base font-extrabold text-foreground">Dicas para uma boa leitura</h3>
+              <ul className="mt-3 space-y-2.5 text-sm text-foreground/80">
+                {[
+                  { icon: Sun, t: "Use um lugar bem iluminado." },
+                  { icon: Sparkles, t: "Evite reflexos na embalagem." },
+                  { icon: ZoomIn, t: "Aproxime até as letras ficarem nítidas." },
+                ].map(({ icon: Icon, t }) => (
+                  <li key={t} className="flex items-center gap-2.5">
+                    <Icon className="w-4 h-4 shrink-0 text-muted-foreground" /> {t}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <p className="flex gap-2 rounded-2xl border border-caution/30 bg-caution/10 px-4 py-3 text-[13px] text-caution-foreground leading-relaxed">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              A análise é automática e pode errar. Sempre confira o rótulo e, na dúvida, fale com o médico ou nutricionista.
+            </p>
+          </aside>
         </div>
       )}
 
@@ -255,17 +354,17 @@ export default function ProductScanner() {
           {/* Controles */}
           <div className="absolute bottom-0 left-0 right-0 px-6 py-6 flex items-center justify-between"
             style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)" }}>
-            <button onClick={reset}
-              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md">
+            <button onClick={reset} aria-label="Fechar câmera"
+              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md hover:bg-white/25 active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <CloseIcon />
             </button>
-            <button onClick={capturePhoto}
-              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center border-4 border-white/50 text-foreground"
+            <button onClick={capturePhoto} aria-label="Tirar foto"
+              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center border-4 border-white/50 text-foreground active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               style={{ boxShadow: "0 0 0 2px rgba(255,255,255,0.3)" }}>
               <ShutterIcon />
             </button>
-            <button onClick={flipCamera}
-              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md">
+            <button onClick={flipCamera} aria-label="Trocar câmera"
+              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md hover:bg-white/25 active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <FlipIcon />
             </button>
           </div>
@@ -282,9 +381,9 @@ export default function ProductScanner() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => { setCapturedImage(null); startCamera(); }}
-                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 transition-colors">
-                Tirar outra
+                onClick={retake}
+                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                {source === "gallery" ? "Escolher outra" : "Tirar outra"}
               </button>
               <button onClick={analyzeImage}
                 className="flex-1 btn-primary flex items-center justify-center gap-2">
@@ -313,69 +412,161 @@ export default function ProductScanner() {
           </div>
           <div className="p-6 flex flex-col items-center gap-3">
             <div className="w-9 h-9 rounded-full border-[3px] border-secondary border-t-primary animate-spin" />
-            <p className="text-base font-bold text-foreground">Analisando ingredientes...</p>
+            <p className="text-base font-bold text-foreground">
+              {progress === null ? "Analisando ingredientes..." : `Lendo o rótulo... ${Math.round(progress * 100)}%`}
+            </p>
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
-              Verificando a composição do produto com as alergias cadastradas no perfil
+              {progress === null
+                ? `Procurando ${allergyList} e avisos de traços na foto.`
+                : "Leitura feita no seu aparelho — a foto não é enviada."}
             </p>
           </div>
         </div>
       )}
 
-      {/* ── RESULT ── */}
-      {stage === "result" && result && (
-        <div className="card-soft w-full max-w-sm p-6 flex flex-col gap-5">
-          {/* Badge principal */}
-          <div className={`rounded-2xl border p-6 flex flex-col items-center gap-3 ${
-            result.safe
-              ? "bg-safe/10 border-safe/40"
-              : "bg-risk/10 border-risk/40"
-          }`}>
-            <span className={result.safe ? "text-safe" : "text-risk"}>
-              {result.safe ? <CheckIcon /> : <AlertIcon />}
+      {/* ── ERROR ── */}
+      {stage === "error" && (
+        <div className="card-soft w-full max-w-sm p-6 flex flex-col gap-5" role="alert">
+          <div className="rounded-2xl border border-caution/40 bg-caution/10 p-6 flex flex-col items-center gap-3 text-center">
+            <span className="text-caution">
+              <AlertIcon />
             </span>
-            <h3 className={`text-lg font-bold tracking-tight text-center ${
-              result.safe ? "text-safe-foreground" : "text-risk-foreground"
-            }`}>
-              {result.safe ? "Produto Seguro ✓" : "Atenção! Alérgenos Detectados"}
+            <h3 className="text-lg font-bold tracking-tight text-caution-foreground">
+              Não foi possível analisar
             </h3>
-            {result.product && (
-              <p className="text-sm text-muted-foreground italic">{result.product}</p>
-            )}
+            <p className="text-sm text-caution-foreground/90 leading-relaxed">
+              Não conseguimos analisar a foto agora (verifique sua conexão) e <strong>nenhum resultado foi gerado</strong>. Não considere este produto
+              seguro nem inseguro com base nesta tentativa. Tente novamente ou confira os ingredientes no rótulo.
+            </p>
           </div>
-
-          {/* Alérgenos encontrados */}
-          {!result.safe && result.allergens && result.allergens.length > 0 && (
-            <div className="bg-risk/5 border border-risk/20 rounded-xl p-4 flex flex-col gap-3">
-              <p className="text-xs font-semibold text-risk-foreground uppercase tracking-wide">
-                Alérgenos encontrados:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {result.allergens.map((a) => (
-                  <span key={a} className="bg-risk text-risk-foreground rounded-full px-3 py-1 text-xs font-semibold">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {result.details && (
-            <p className="text-sm text-muted-foreground leading-relaxed text-center">{result.details}</p>
-          )}
-
-          {/* Ações */}
           <div className="flex gap-3">
             <button
-              onClick={() => { setCapturedImage(null); startCamera(); }}
-              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 transition-colors">
-              <RetryIcon /> Novo scan
+              onClick={reset}
+              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Cancelar
             </button>
-            <button onClick={reset} className="flex-1 btn-primary flex items-center justify-center">
-              Concluir
+            <button
+              onClick={analyzeImage}
+              disabled={!capturedImage}
+              className="flex-1 btn-primary flex items-center justify-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+            >
+              <RetryIcon /> Tentar novamente
             </button>
           </div>
         </div>
       )}
+
+      {/* ── RESULT ── */}
+      {stage === "result" && outcome && (() => {
+        // Monta a apresentação conforme a origem da análise
+        type View = { tone: "safe" | "caution" | "risk" | "neutral"; title: string; text?: string; terms?: string[]; product?: string };
+        let view: View;
+        if (outcome.source === "ai") {
+          const r = outcome.result;
+          view = r.safe
+            ? { tone: "safe", title: "Produto seguro", text: r.details, product: r.product }
+            : { tone: "risk", title: "Alérgenos detectados", text: r.details, terms: r.allergens, product: r.product };
+        } else {
+          const r = outcome.result;
+          const what = joinLabels(r.hits.map((h) => h.label.toLowerCase().replace(" (aplv)", "")));
+          const onlyMilk = r.hits.length > 0 && r.hits.every((h) => h.id === "leite");
+          if (r.verdict === "contains")
+            view = onlyMilk
+              ? { tone: "risk", title: "Contém leite ou derivados", terms: r.found, text: "Encontramos ingredientes de origem láctea no rótulo. Evite oferecer este produto." }
+              : { tone: "risk", title: `Contém ${what}`, terms: r.found, text: "Encontramos no rótulo ingredientes ligados às alergias do seu perfil. Evite este produto." };
+          else if (r.verdict === "traces" && !r.lowQuality)
+            view = { tone: "caution", title: `Pode conter traços de ${what}`, terms: r.found, text: `O rótulo avisa que o produto pode conter ${what}. Para quem tem essa alergia, o mais seguro é evitar.` };
+          else if (r.verdict === "traces")
+            view = { tone: "caution", title: `Possível aviso de ${what}`, terms: r.found, text: `Encontramos um possível aviso de traços de ${what}, mas a foto está pouco nítida. Confira no rótulo.` };
+          else if (r.lowQuality)
+            view = { tone: "neutral", title: "Foto pouco nítida", text: "Não conseguimos ler o rótulo com segurança. Tire outra foto com boa luz, sem reflexos e com as letras em foco." };
+          else
+            view = { tone: "neutral", title: `Não encontramos ${allergyList} no texto lido`, text: "Isso não garante que o produto é seguro: a leitura automática pode falhar. Confira os ingredientes e os avisos de alergênicos no rótulo." };
+        }
+        const TONE = {
+          safe: { box: "bg-safe/10 border-safe/40", fg: "text-safe-foreground", icon: "text-safe", chip: "bg-safe/20" },
+          caution: { box: "bg-caution/10 border-caution/40", fg: "text-caution-foreground", icon: "text-caution", chip: "bg-caution/25" },
+          risk: { box: "bg-risk/10 border-risk/40", fg: "text-risk-foreground", icon: "text-risk", chip: "bg-risk/25" },
+          neutral: { box: "bg-secondary border-border", fg: "text-foreground", icon: "text-muted-foreground", chip: "bg-card" },
+        }[view.tone];
+        return (
+          <div className="w-full max-w-4xl grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 md:gap-6 items-start">
+            {/* Foto enviada */}
+            {capturedImage && (
+              <figure className="rounded-3xl bg-card border border-border/60 p-3 shadow-[0_1px_2px_hsl(var(--primary)/0.06),0_10px_28px_-14px_hsl(160_40%_15%/0.18)]">
+                <button
+                  type="button"
+                  onClick={() => setPhotoOpen(true)}
+                  aria-label="Ampliar a foto enviada"
+                  className="group relative block w-full overflow-hidden rounded-2xl bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <img
+                    src={capturedImage}
+                    alt="Foto do rótulo enviada para análise"
+                    className="w-full max-h-[420px] object-contain transition-transform duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:scale-[1.02] group-active:scale-[0.99]"
+                  />
+                  <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm opacity-90 group-hover:opacity-100 transition-opacity">
+                    <ZoomIn className="w-3.5 h-3.5" /> Ampliar
+                  </span>
+                </button>
+                <figcaption className="px-1 pt-3 text-xs text-muted-foreground">
+                  Foto enviada · toque para ver em tamanho grande
+                </figcaption>
+              </figure>
+            )}
+
+          <div className="card-soft w-full p-6 flex flex-col gap-5">
+            <div className={`rounded-2xl border p-6 flex flex-col items-center gap-3 text-center ${TONE.box}`} role="status">
+              <span className={TONE.icon}>{view.tone === "safe" ? <CheckIcon /> : <AlertIcon />}</span>
+              <h3 className={`text-lg font-bold tracking-tight ${TONE.fg}`}>{view.title}</h3>
+              {view.product && <p className="text-sm text-muted-foreground italic">{view.product}</p>}
+              {view.terms && view.terms.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {view.terms.map((t) => (
+                    <span key={t} className={`rounded-full px-3 py-1 text-xs font-semibold ${TONE.chip} ${TONE.fg}`}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {view.text && <p className={`text-sm leading-relaxed ${TONE.fg} opacity-90`}>{view.text}</p>}
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center leading-relaxed">
+              {outcome.source === "ai"
+                ? "Análise feita pela nossa IA."
+                : `Análise feita no seu aparelho pela leitura do texto (qualidade da leitura: ${outcome.result.confidence}%).`}{" "}
+              Sempre confira o rótulo.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={retake}
+                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <RetryIcon /> Novo scan
+              </button>
+              <button onClick={reset} className="flex-1 btn-primary flex items-center justify-center">
+                Concluir
+              </button>
+            </div>
+          </div>
+          </div>
+        );
+      })()}
+
+      {/* Foto em tamanho grande */}
+      <Dialog open={photoOpen && !!capturedImage} onOpenChange={setPhotoOpen}>
+        <DialogContent className="max-w-5xl w-[calc(100vw-2rem)] p-3 sm:p-4 rounded-3xl bg-card">
+          <DialogTitle className="px-1 text-base font-bold">Foto enviada</DialogTitle>
+          <DialogDescription className="sr-only">Imagem do rótulo usada na análise</DialogDescription>
+          {capturedImage && (
+            <div className="overflow-auto max-h-[80vh] rounded-2xl bg-black/5">
+              <img src={capturedImage} alt="Foto do rótulo em tamanho grande" className="w-full h-auto" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
