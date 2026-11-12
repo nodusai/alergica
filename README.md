@@ -14,6 +14,8 @@
   <img src="https://img.shields.io/badge/Lovable_Cloud-Backend-10B981?logo=supabase&logoColor=white" alt="Lovable Cloud" />
 </p>
 
+> 📚 **Documentação oficial e atualizada:** veja a pasta [`docs/`](docs/README.md) — Arquitetura, Documentação Técnica e Manual do Usuário (Markdown e PDF).
+
 ## 📖 Sobre o Projeto
 O **AlerGica** é uma aplicação web voltada para **pais, mães, farmacêuticos e médicos** que lidam com alergias alimentares. A solução inicial foca na **APLV** (Alergia à Proteína do Leite de Vaca), mas a arquitetura foi projetada para expandir e atender **todas as alergias alimentares** futuramente.
 ### 🎯 Problema que Resolve

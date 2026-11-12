@@ -51,7 +51,7 @@ const RetryIcon = () => (
 );
 
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
-type Stage = "idle" | "camera" | "preview" | "analyzing" | "result";
+type Stage = "idle" | "camera" | "preview" | "analyzing" | "result" | "error";
 
 interface ScanResult {
   safe: boolean;
@@ -147,6 +147,7 @@ export default function ProductScanner() {
     if (!capturedImage) return;
     setStage("analyzing");
     try {
+      if (!N8N_WEBHOOK_URL) throw new Error("Webhook de análise não configurado");
       const res = await fetch(capturedImage);
       const blob = await res.blob();
       const formData = new FormData();
@@ -158,18 +159,16 @@ export default function ProductScanner() {
       });
 
       if (!response.ok) throw new Error("Erro na análise");
-      const data: ScanResult = await response.json();
-      setResult(data);
-    } catch {
-      // Fallback de demonstração enquanto o webhook não retorna
-      setResult({
-        safe: false,
-        product: "Produto Analisado",
-        allergens: ["Leite", "Derivados de leite"],
-        details: "Foram detectados ingredientes que podem conter proteína do leite de vaca. Evite oferecer este produto ao seu filho.",
-      });
+      const data = await response.json();
+      // Só exibe resultado se a resposta tiver o veredito; nunca inventa um resultado
+      if (typeof data?.safe !== "boolean") throw new Error("Resposta inválida da análise");
+      setResult(data as ScanResult);
+      setStage("result");
+    } catch (err) {
+      console.error("Erro ao analisar produto:", err);
+      setResult(null);
+      setStage("error");
     }
-    setStage("result");
   }, [capturedImage]);
 
   const reset = useCallback(() => {
@@ -317,6 +316,39 @@ export default function ProductScanner() {
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
               Verificando a composição do produto com as alergias cadastradas no perfil
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── ERROR ── */}
+      {stage === "error" && (
+        <div className="card-soft w-full max-w-sm p-6 flex flex-col gap-5" role="alert">
+          <div className="rounded-2xl border border-caution/40 bg-caution/10 p-6 flex flex-col items-center gap-3 text-center">
+            <span className="text-caution">
+              <AlertIcon />
+            </span>
+            <h3 className="text-lg font-bold tracking-tight text-caution-foreground">
+              Não foi possível analisar
+            </h3>
+            <p className="text-sm text-caution-foreground/90 leading-relaxed">
+              A análise do rótulo falhou e <strong>nenhum resultado foi gerado</strong>. Não considere este produto
+              seguro nem inseguro com base nesta tentativa. Tente novamente ou confira os ingredientes no rótulo.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={reset}
+              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={analyzeImage}
+              disabled={!capturedImage}
+              className="flex-1 btn-primary flex items-center justify-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+            >
+              <RetryIcon /> Tentar novamente
+            </button>
           </div>
         </div>
       )}

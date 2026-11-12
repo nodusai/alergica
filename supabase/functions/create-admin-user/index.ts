@@ -24,6 +24,28 @@ serve(async (req) => {
       },
     });
 
+    // Somente administradores autenticados podem criar usuários.
+    // A chave pública (anon) também é um JWT válido, por isso não basta o
+    // verify_jwt da plataforma: validamos o usuário e o papel 'admin'.
+    const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
+    }
+
+    const { data: caller, error: callerError } = await supabaseAdmin.auth.getUser(token);
+    if (callerError || !caller?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
+    }
+
+    const { data: isAdmin, error: roleCheckError } = await supabaseAdmin.rpc("has_role", {
+      _user_id: caller.user.id,
+      _role: "admin",
+    });
+    if (roleCheckError || isAdmin !== true) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: jsonHeaders });
+    }
+
     const { email, password, fullName, makeAdmin } = await req.json();
 
     if (!email || !password) {
