@@ -2,7 +2,7 @@
 titulo: Documentação Técnica do Sistema
 subtitulo: Referência para desenvolvimento, implantação e manutenção do AlerGica — ambiente, configuração, dicionário de dados, APIs, serviços e componentes.
 categoria: Documentação Técnica
-versao: 1.1.0
+versao: 1.4.0
 atualizado: 12 de novembro de 2026
 publico: Desenvolvedores e equipe de operação
 classificacao: Confidencial
@@ -187,10 +187,10 @@ CORS liberado para `http://localhost:8080` e `http://localhost:3000`. Para produ
 | `user_id` | uuid único → `auth.users` | Dono do perfil |
 | `full_name` | text | Nome completo |
 | `profile_type` | text | `alergica`, `mae`, `pai`, `farmaceutico` ou `medico` |
-| `birth_date` | date | Data de nascimento |
-| `gender` | text | `masculino`, `feminino`, `nao_binario`, `prefiro_nao_dizer` |
-| `city` / `state` | text | Cidade e UF |
-| `profession` | text | Profissão |
+| `birth_date` | date | Data de nascimento (obrigatória no cadastro; usada para exigir 18+) |
+| `gender` | text | `masculino`, `feminino`, `nao_binario` ou nulo (opcional) |
+| `city` / `state` | text | Cidade e UF (opcionais) |
+| `profession` | text | Profissão (opcional) |
 | `phone` | text | Telefone |
 | `allergy_info` | text | Alergias (texto livre, pode vir da análise por IA no onboarding) |
 | `observation` | text | Observações de saúde |
@@ -231,6 +231,19 @@ RLS: o usuário vê os próprios papéis; somente `admin` gerencia.
 | `completed_at` | timestamptz | Quando concluiu |
 
 A ausência de linha faz o painel exibir o onboarding.
+
+#### `user_consents` — histórico de consentimentos (LGPD)
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | Identificador |
+| `user_id` | uuid → `auth.users` (`ON DELETE CASCADE`) | Titular |
+| `consent_type` | text | `termos_uso`, `politica_privacidade` ou `dados_saude` |
+| `version` | text | Versão do documento aceito (`LEGAL.termsVersion` / `LEGAL.privacyVersion`) |
+| `granted` | boolean | Aceito ou recusado |
+| `created_at` | timestamptz | Momento do aceite |
+
+RLS: o titular lê e insere os próprios registros; `admin` lê todos; não há UPDATE nem DELETE pelo usuário (histórico só de inclusão). O registro principal também fica em `auth.users.raw_user_meta_data.lgpd_consents`, gravado no `signUp` — assim a prova do consentimento existe mesmo antes da migração ser aplicada.
 
 #### `suggestions` e `feedback` — mensagens dos usuários
 
@@ -327,6 +340,7 @@ A migração `seed_medications` popula 5 grupos, 34 ingredientes e 25 medicament
 | `20260306000004_create_news_cache.sql` | `news_cache` |
 | `20260306000005_increment_medication_access_fn.sql` | Função de contador de acessos |
 | `20260308000000_add_profile_demographics.sql` | `birth_date`, `gender`, `city`, `state`, `profession` |
+| `20261112000000_lgpd_consents.sql` | `user_consents` (histórico de consentimentos) e políticas RLS |
 
 ### 6.6 Como aplicar uma mudança de esquema
 
@@ -385,7 +399,43 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 6. Consulta: `tem_risco_aplv = false`, id diferente do atual, termo em nome ou composição, ordenado por `access_count`, até 300 linhas.
 7. No cliente: mantém só registros cuja chave canônica é idêntica; deduplica por fabricante normalizado (sem `Ltda`, `S.A.`, `EIRELI`, `ME`, `EPP`); para em 6.
 
-### 7.4 `services/studies.ts`
+### 7.4 `services/auth.ts`
+
+| Função | Descrição |
+|---|---|
+| `requestPasswordReset(email)` | `resetPasswordForEmail` com `redirectTo = <origem>/redefinir-senha` |
+| `updatePassword(password)` | `auth.updateUser({ password })` na sessão de recuperação |
+
+> **Atenção:** cadastre `https://<dominio>/redefinir-senha` em Supabase → Authentication → URL Configuration → *Redirect URLs*, senão o link do e-mail é recusado.
+
+### 7.5 `services/profile.ts` e `lib/names.ts`
+
+| Função | Descrição |
+|---|---|
+| `getProfileSummary(userId)` | `full_name`, `profile_type` e `gender` do perfil, para o menu lateral |
+| `shortName(nome)` | Dois primeiros nomes, mantendo partículas entre eles e corrigindo maiúsculas ("CAROLINE LIMA MARQUES" → "Caroline Lima"; "Maria de Souza Santos" → "Maria de Souza") |
+| `initials(nome)` | Iniciais para o avatar, ignorando partículas |
+| `nameFromEmail(email)` | Nome provisório a partir do e-mail, quando não há nome cadastrado |
+| `displayName(nomePerfil, user)` | Nome curto na ordem perfil → cadastro → e-mail; usado no menu, no perfil e na saudação do painel |
+| `firstName(nome)` | Primeiro nome, para saudações |
+
+`lib/theme.ts`: `applySavedTheme`, `setDarkTheme`, `isDarkTheme` e `onThemeChange` (evento `alergica:theme`). Tema salvo em `localStorage("theme")` e aplicado pela classe `dark` no `<html>`.
+
+O menu usa o nome nesta ordem: `profiles.full_name` → `user_metadata.full_name` (cadastro) → e-mail.
+
+### 7.5.1 `services/privacy.ts` (LGPD)
+
+| Função | Descrição |
+|---|---|
+| `buildSignupConsents()` | Monta os três consentimentos do cadastro (termos, política, dados de saúde) com versão e data |
+| `logConsents(userId, consents)` | Grava o histórico em `user_consents` (falha não bloqueia o cadastro) |
+| `getMyConsents()` | Lê `user_metadata.lgpd_consents` do usuário logado |
+| `exportMyData()` / `downloadMyData()` | Junta conta, perfil, bebês, sugestões, feedback, onboarding e consentimentos e baixa como JSON (art. 18, II e V) |
+| `deleteMyAccount()` | Chama a Edge Function `delete-account` e encerra a sessão (art. 18, VI) |
+
+Os dados do controlador, do encarregado e as versões dos documentos ficam em `src/config/legal.ts` (`LEGAL`). **Preencha os campos entre colchetes antes de publicar** e aumente a versão sempre que mudar o texto da Política ou dos Termos.
+
+### 7.6 `services/studies.ts`
 
 | Item | Detalhe |
 |---|---|
@@ -396,7 +446,7 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 | Link | PubMed (`pmid`) → DOI → página Europe PMC |
 | Tradução | MyMemory `en → pt-BR`, tempo limite de 4 s, cache em `localStorage` (`alergica:study-title-pt`) |
 
-### 7.5 `services/api.ts`
+### 7.7 `services/api.ts`
 
 `apiFetch<T>(path, options)` chama `/api{path}` com o cabeçalho `Authorization: Bearer <JWT>` da sessão atual e lança erro `API <status>: <corpo>` em respostas não-2xx. Preparado para a API FastAPI; ainda sem chamadas na interface.
 
@@ -422,7 +472,18 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 
 > **Nota:** a chave pública (*anon*) também é um JWT válido para a plataforma, por isso a função faz a própria checagem de usuário e papel em vez de confiar só no `verify_jwt`. O primeiro administrador deve ser criado pelo painel do Supabase (inserindo a linha em `user_roles`).
 
-### 8.3 API FastAPI
+### 8.3 Edge Function `delete-account`
+
+| Item | Detalhe |
+|---|---|
+| Autenticação | `Authorization: Bearer <JWT do próprio usuário>` (o SDK envia automaticamente em `functions.invoke`) |
+| Resposta | `200 { success: true }` · `401` sem login válido · `500 { success: false, error }` |
+| Lógica | Apaga as linhas do usuário em `babies`, `suggestions`, `feedback`, `solicitado_inclusao`, `user_consents`, `user_onboarding`, `user_roles` e `profiles` (tabelas inexistentes são ignoradas) e depois exclui o usuário com `auth.admin.deleteUser` |
+| Publicação | `supabase functions deploy delete-account` |
+
+Arquivos no Storage (imagens de `solicitado_inclusao`) ainda não são apagados pela função.
+
+### 8.4 API FastAPI
 
 Todos os endpoints de medicamentos exigem `Authorization: Bearer <JWT do Supabase>`.
 
@@ -435,7 +496,7 @@ Todos os endpoints de medicamentos exigem `Authorization: Bearer <JWT do Supabas
 
 Documentação interativa em `http://localhost:8000/docs`.
 
-### 8.4 Webhook n8n
+### 8.5 Webhook n8n
 
 | Uso | Requisição | Resposta esperada |
 |---|---|---|
@@ -446,17 +507,19 @@ Documentação interativa em `http://localhost:8000/docs`.
 
 | Componente | Responsabilidade |
 |---|---|
-| `Sidebar` | Barra lateral (desktop) e conteúdo do drawer (celular): logo, tema, Meu Perfil, Configurações, Sair |
+| `Sidebar` | Barra lateral (desktop) e conteúdo do drawer (celular): logo, tema, cartão do usuário (dois primeiros nomes, iniciais e, para farmacêutico/médico, a profissão no feminino ou masculino conforme `gender`), menu Início / Meu Perfil / Configurações, Sair e links legais |
 | `ExpandableTabs` | Menu inferior fixo com os módulos Início, Remédios, Produtos, Restaurantes, Nutrição |
 | `MedicationCard` | Card de medicamento com nome, fabricante e selo de risco |
 | `RiskBadge` | Selo colorido do nível de risco |
 | `PaginationBar` | Navegação entre páginas (Anterior, números com reticências, Próxima; no celular mostra "página / total") |
 | `APLVInfoCarousel` | Carrossel com 10 fichas educativas com fonte e estudos recentes traduzidos |
 | `OnboardingModal` | Boas-vindas e configuração do perfil de alergias com IA (pulada para profissionais de saúde) |
-| `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error` |
+| `LegalLayout` | Layout das páginas públicas de Política de Privacidade e Termos de Uso |
+| `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error`; foto pela câmera ou da galeria (imagem até 10 MB) |
 | `BabyManager` | Lista, inclusão e remoção de bebês, com cálculo de idade |
 | `ChatWidget` | Botão flutuante do mascote: Suporte, Sugestão e Feedback |
-| `ThemeToggle` | Alterna tema claro/escuro |
+| `ThemeToggle` | Botão de tema da barra lateral; usa `lib/theme.ts` e fica sincronizado com o seletor de Configurações |
+| `PageHeader` | Cabeçalho padrão das páginas internas: menu (celular), voltar, título `font-display` e subtítulo |
 | `NavLink` | Link de navegação com estado ativo |
 | `ui/*` | Biblioteca shadcn/ui (botões, cards, drawer, diálogo, carrossel, skeleton, toasts…) |
 
@@ -479,7 +542,9 @@ Há um conjunto equivalente para o tema escuro (classe `.dark`). Use sempre os t
 
 ### 10.2 Tipografia, sombra e movimento
 
-- Fonte: **Nunito** (400–800) carregada do Google Fonts.
+- Fontes: **Nunito** (400–800) no texto e **Fraunces** (600–700, classe `font-display`) em títulos de destaque — tela de login, documentos legais, 404.
+- Utilitário `.grain`: textura de ruído SVG sobre superfícies com gradiente (painel da marca no login).
+- Classe `.legal-doc`: tipografia de leitura dos documentos legais.
 - Sombras em camadas, tingidas com a cor da marca (`--shadow-soft`, `--shadow-card`, `--shadow-hover`).
 - Animações utilitárias: `animate-fade-in`, `animate-slide-in-right`, `animate-float`. Anime apenas `transform` e `opacity`; não use `transition-all`.
 - Todo elemento clicável precisa de estados `hover`, `focus-visible` e `active`.
@@ -489,7 +554,7 @@ Há um conjunto equivalente para o tema escuro (classe `.dark`). Use sempre os t
 | Item | Estado |
 |---|---|
 | Executor | Vitest com ambiente jsdom e Testing Library (`src/test/setup.ts`) |
-| Cobertura atual | Apenas um teste de exemplo |
+| Cobertura atual | Teste de exemplo e `src/lib/names.test.ts` (formatação de nomes) |
 | Prioridade 1 | Testes unitários de `medToRisk`, `parseTextField`, `activeKeysOf`, `getSafeAlternatives` (com cliente simulado) |
 | Prioridade 2 | Testes de componentes: `AuthPage` (validações), `MedicationDetails` (destaque de excipientes) |
 | Prioridade 3 | Testes ponta a ponta (Playwright) de cadastro, busca e detalhe |
@@ -554,3 +619,6 @@ O gerador (`scripts/build-docs.mjs`) monta capa, sumário e diagramas Mermaid e 
 | 1.0.0 | 12/11/2026 | Primeira versão completa da documentação técnica. |
 | 1.0.1 | 12/11/2026 | `create-admin-user` restrita a administradores (seção 8.2); tratamento de erro do scanner (seções 8.4 e 9). |
 | 1.1.0 | 12/11/2026 | Paginação de 30 itens no módulo Remédios: `getMedicationsPage`, `MEDS_PAGE_SIZE`, busca em lotes em `getMedicationsByRisk` e componente `PaginationBar` (seções 7.1 e 9). |
+| 1.2.0 | 12/11/2026 | LGPD: tabela `user_consents`, Edge Function `delete-account`, `services/privacy.ts`, `services/auth.ts`, `config/legal.ts`; campos opcionais no perfil; fonte `font-display` (seções 6, 7, 8, 9 e 10). |
+| 1.3.0 | 12/11/2026 | Menu lateral redesenhado: `services/profile.ts`, `lib/names.ts` e testes (seções 7.5, 9 e 11). |
+| 1.4.0 | 12/11/2026 | `PageHeader`, `lib/theme.ts`, `displayName`/`firstName`; perfil sem estatísticas fictícias; scanner aceita foto da galeria (seções 7.5 e 9). |

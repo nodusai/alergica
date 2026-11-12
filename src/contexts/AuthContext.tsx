@@ -7,7 +7,12 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata?: Record<string, unknown>,
+  ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -54,7 +59,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAdminRole();
   }, [user]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata: Record<string, unknown> = {},
+  ) => {
     // const redirectUrl = `${window.location.origin}/dashboard`;
 
     const { error } = await supabase.auth.signUp({
@@ -64,6 +74,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // emailRedirectTo: redirectUrl, // Desabilitado: login automático após cadastro
         data: {
           full_name: fullName,
+          // ex.: lgpd_consents — registro dos consentimentos dados no cadastro
+          ...extraMetadata,
         },
       },
     });

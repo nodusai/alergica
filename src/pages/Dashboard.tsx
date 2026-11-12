@@ -22,6 +22,7 @@ import PaginationBar from "@/components/PaginationBar";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductScanner from "@/components/ProductScanner";
+import { displayName, firstName } from "@/lib/names";
 
 
 type RiskLevel = "safe" | "caution" | "risk";
@@ -38,6 +39,15 @@ const RISK_FILTER_LABELS: { value: RiskLevel | "all"; label: string }[] = [
   { value: "caution", label: "Atenção" },
   { value: "risk", label: "Risco" },
 ];
+
+const MODULE_HEADERS: Partial<Record<ModuleTab, { title: string; subtitle: string }>> = {
+  produtos: {
+    title: "Verificar produto",
+    subtitle: "Fotografe a lista de ingredientes de um alimento e descubra se ele tem leite ou derivados.",
+  },
+  restaurantes: { title: "Restaurantes", subtitle: "Lugares com opções seguras para quem tem APLV." },
+  nutricao: { title: "Nutrição", subtitle: "Orientações e receitas sem leite para o dia a dia." },
+};
 
 const MED_LINK =
   "group block rounded-2xl active:scale-[0.98] transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -64,7 +74,7 @@ const PlaceholderModule = ({ label }: { label: string }) => (
 const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userProfileType, setUserProfileType] = useState<string | null>(null);
-  const [userName, setUserName] = useState("Mamãe");
+  const [userName, setUserName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleTab>("inicio");
   const [searchQuery, setSearchQuery] = useState("");
@@ -101,7 +111,8 @@ const Dashboard = () => {
 
       if (profileRes.data?.profile_type) setUserProfileType(profileRes.data.profile_type);
       if (!onboardingRes.data) setShowOnboarding(true);
-      if (profileRes.data?.full_name) setUserName(profileRes.data.full_name.split(" ")[0]);
+      // Nome: perfil → cadastro → e-mail (nunca um nome genérico como "Mamãe")
+      setUserName(firstName(displayName(profileRes.data?.full_name, user)));
       setPopularMedications(popular);
       setLoadingPopular(false);
     };
@@ -239,7 +250,7 @@ const Dashboard = () => {
               {activeModule === "inicio" || activeModule === "medicamentos" ? (
                 <div className="relative overflow-hidden rounded-3xl border border-primary/15 px-5 py-6 md:px-8 md:py-8 bg-[radial-gradient(120%_120%_at_0%_0%,hsl(var(--primary)/0.16)_0%,transparent_55%),radial-gradient(90%_120%_at_100%_100%,hsl(var(--safe)/0.10)_0%,transparent_60%)] bg-card shadow-[0_1px_2px_hsl(var(--primary)/0.08),0_16px_40px_-20px_hsl(var(--primary)/0.45)]">
                   <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em] leading-tight">
-                    Olá, {userName}! 👋
+                    {userName ? `Olá, ${userName}!` : "Olá!"} 👋
                   </h2>
                   <p className="text-sm md:text-base text-muted-foreground mt-1.5 mb-5 md:mb-6 leading-relaxed max-w-xl">
                     {activeModule === "medicamentos"
@@ -276,9 +287,15 @@ const Dashboard = () => {
                   </ul>
                 </div>
               ) : (
-                <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em]">
-                  Olá, {userName}! 👋
-                </h2>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">{userName ? `Olá, ${userName}!` : "Olá!"} 👋</p>
+                  <h2 className="font-display text-[2rem] md:text-[2.4rem] font-bold text-foreground tracking-[-0.03em] leading-[1.1] mt-1">
+                    {MODULE_HEADERS[activeModule]?.title}
+                  </h2>
+                  <p className="text-[15px] text-muted-foreground mt-2 leading-relaxed max-w-2xl">
+                    {MODULE_HEADERS[activeModule]?.subtitle}
+                  </p>
+                </div>
               )}
             </div>
 

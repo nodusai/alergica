@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { AlertTriangle, Info, ListChecks, Lock, Milk, ScanLine, Sparkles, Sun, Upload, ZoomIn } from "lucide-react";
 
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
 
@@ -68,6 +69,10 @@ export default function ProductScanner() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [scanLine, setScanLine] = useState(0);
+  // De onde veio a foto atual: define se "tirar outra" abre a câmera ou a galeria
+  const [source, setSource] = useState<"camera" | "gallery">("camera");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -133,6 +138,7 @@ export default function ProductScanner() {
     canvas.getContext("2d")!.drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setCapturedImage(dataUrl);
+    setSource("camera");
     stopCamera();
     setStage("preview");
   }, [stopCamera]);
@@ -171,11 +177,49 @@ export default function ProductScanner() {
     }
   }, [capturedImage]);
 
+  /** Foto escolhida da galeria (útil no computador, sem câmera traseira) */
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite escolher o mesmo arquivo de novo
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Escolha um arquivo de imagem (JPG ou PNG).");
+      setStage("idle");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("A imagem é muito grande. Escolha uma foto de até 10 MB.");
+      setStage("idle");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadError(null);
+      setCapturedImage(reader.result as string);
+      setSource("gallery");
+      setStage("preview");
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  /** Nova foto pelo mesmo caminho usado antes (câmera ou galeria) */
+  const retake = useCallback(() => {
+    setCapturedImage(null);
+    setResult(null);
+    if (source === "gallery") {
+      setStage("idle");
+      fileInputRef.current?.click();
+    } else {
+      startCamera();
+    }
+  }, [source, startCamera]);
+
   const reset = useCallback(() => {
     stopCamera();
     setCapturedImage(null);
     setResult(null);
     setPermissionDenied(false);
+    setUploadError(null);
     setStage("idle");
   }, [stopCamera]);
 
@@ -183,48 +227,110 @@ export default function ProductScanner() {
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col items-center justify-center py-4 animate-fade-in">
+    <div className="flex flex-col items-center justify-center animate-fade-in">
       <canvas ref={canvasRef} className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} aria-hidden tabIndex={-1} />
 
       {/* ── IDLE ── */}
       {stage === "idle" && (
-        <div className="card-soft w-full max-w-sm p-8 flex flex-col items-center gap-5 text-center">
-          {/* Ícone com pulse */}
-          <div className="relative w-20 h-20 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse" />
-            <div className="relative z-10 w-16 h-16 rounded-full bg-secondary border-2 border-primary/20 flex items-center justify-center">
-              <span className="text-3xl">🛒</span>
+        <div className="w-full grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6 items-start">
+          {/* Ação principal */}
+          <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-card p-6 md:p-8 bg-[radial-gradient(110%_90%_at_0%_0%,hsl(var(--primary)/0.16)_0%,transparent_55%),radial-gradient(80%_80%_at_100%_100%,hsl(40_95%_70%/0.14)_0%,transparent_60%)] shadow-[0_1px_2px_hsl(var(--primary)/0.08),0_16px_40px_-20px_hsl(var(--primary)/0.45)]">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[hsl(152_70%_62%)] to-[hsl(165_55%_40%)] text-white flex items-center justify-center shadow-[0_10px_24px_-10px_hsl(160_50%_30%/0.7)]">
+              <ScanLine className="w-8 h-8" />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground tracking-tight">Verificar Produto</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Fotografe a tabela de ingredientes de qualquer produto alimentício. Nossa IA verifica se há proteína do leite de vaca ou outros alérgenos cadastrados no perfil do seu filho.
+            <h3 className="mt-5 text-xl md:text-2xl font-extrabold tracking-[-0.02em] text-foreground">Fotografe o rótulo</h3>
+            <p className="mt-2 text-[15px] text-muted-foreground leading-relaxed">
+              Nossa IA lê a lista de ingredientes e os avisos de alergênicos e mostra se o produto tem proteína do leite
+              de vaca ou outros alérgenos do seu perfil.
             </p>
-          </div>
 
-          <div className="flex flex-wrap gap-2 justify-center">
-            {["📋 Ingredientes", "⚗️ Excipientes", "🏭 Fábrica"].map((t) => (
-              <span key={t} className="bg-secondary text-secondary-foreground rounded-full px-3 py-1 text-xs font-medium">
-                {t}
-              </span>
-            ))}
-          </div>
+            <ul className="mt-5 flex flex-wrap gap-2" aria-label="O que é verificado">
+              {[
+                { icon: Milk, label: "Leite e derivados" },
+                { icon: AlertTriangle, label: "Avisos de traços" },
+                { icon: ListChecks, label: "Outros alérgenos" },
+              ].map(({ icon: Icon, label }) => (
+                <li key={label} className="inline-flex items-center gap-1.5 rounded-full bg-card/80 border border-border/70 px-3 py-1.5 text-[13px] font-semibold text-foreground/80">
+                  <Icon className="w-3.5 h-3.5 text-[hsl(152_55%_32%)] dark:text-primary" /> {label}
+                </li>
+              ))}
+            </ul>
 
-          {permissionDenied && (
-            <div className="w-full bg-caution/10 border border-caution/40 rounded-xl p-3 text-xs text-caution-foreground text-left">
-              ⚠️ Acesso à câmera negado. Habilite nas configurações do navegador e tente novamente.
+            {(permissionDenied || uploadError) && (
+              <div role="alert" className="mt-5 rounded-xl border border-caution/40 bg-caution/10 px-4 py-3 text-sm text-caution-foreground leading-relaxed">
+                {uploadError ??
+                  "O acesso à câmera foi negado. Libere a câmera nas configurações do navegador ou envie uma foto da galeria."}
+              </div>
+            )}
+
+            <div className="mt-6 grid sm:grid-cols-2 gap-3">
+              <button onClick={() => startCamera()} className="btn-primary h-12 py-0 flex items-center justify-center gap-2">
+                <CameraIcon /> Abrir câmera
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="h-12 rounded-xl border-2 border-border bg-card text-[15px] font-bold text-foreground inline-flex items-center justify-center gap-2 hover:border-primary/60 hover:bg-secondary active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Upload className="w-[18px] h-[18px]" /> Enviar foto
+              </button>
             </div>
-          )}
 
-          <button
-            onClick={() => startCamera()}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
-            <CameraIcon />
-            Abrir Câmera
-          </button>
+            <p className="mt-5 flex gap-2 text-[13px] text-muted-foreground leading-relaxed">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                A foto vai para o nosso serviço de análise por IA só para ler os ingredientes. Evite fotografar pessoas ou
+                documentos.{" "}
+                <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+                  Saiba mais
+                </a>
+              </span>
+            </p>
+          </section>
+
+          {/* Como funciona + dicas */}
+          <aside className="space-y-4">
+            <section className="rounded-3xl bg-card border border-border/60 p-6 shadow-[0_1px_2px_hsl(var(--primary)/0.06),0_10px_28px_-14px_hsl(160_40%_15%/0.18)]">
+              <h3 className="text-base font-extrabold text-foreground">Como funciona</h3>
+              <ol className="mt-4 space-y-4">
+                {[
+                  { t: "Fotografe os ingredientes", d: "Enquadre só a lista de ingredientes e os avisos de alergênicos." },
+                  { t: "Confira a foto", d: "As letras precisam estar nítidas e legíveis." },
+                  { t: "Veja o resultado", d: "Seguro ou com alérgenos, com a lista do que foi encontrado." },
+                ].map((step, i) => (
+                  <li key={step.t} className="flex gap-3">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-primary/20 text-[13px] font-extrabold text-foreground flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="block text-[15px] font-bold text-foreground leading-snug">{step.t}</span>
+                      <span className="block text-sm text-muted-foreground leading-relaxed">{step.d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="rounded-3xl bg-secondary/60 border border-border/60 p-6">
+              <h3 className="text-base font-extrabold text-foreground">Dicas para uma boa leitura</h3>
+              <ul className="mt-3 space-y-2.5 text-sm text-foreground/80">
+                {[
+                  { icon: Sun, t: "Use um lugar bem iluminado." },
+                  { icon: Sparkles, t: "Evite reflexos na embalagem." },
+                  { icon: ZoomIn, t: "Aproxime até as letras ficarem nítidas." },
+                ].map(({ icon: Icon, t }) => (
+                  <li key={t} className="flex items-center gap-2.5">
+                    <Icon className="w-4 h-4 shrink-0 text-muted-foreground" /> {t}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <p className="flex gap-2 rounded-2xl border border-caution/30 bg-caution/10 px-4 py-3 text-[13px] text-caution-foreground leading-relaxed">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              A análise é automática e pode errar. Sempre confira o rótulo e, na dúvida, fale com o médico ou nutricionista.
+            </p>
+          </aside>
         </div>
       )}
 
@@ -254,17 +360,17 @@ export default function ProductScanner() {
           {/* Controles */}
           <div className="absolute bottom-0 left-0 right-0 px-6 py-6 flex items-center justify-between"
             style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)" }}>
-            <button onClick={reset}
-              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md">
+            <button onClick={reset} aria-label="Fechar câmera"
+              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md hover:bg-white/25 active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <CloseIcon />
             </button>
-            <button onClick={capturePhoto}
-              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center border-4 border-white/50 text-foreground"
+            <button onClick={capturePhoto} aria-label="Tirar foto"
+              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center border-4 border-white/50 text-foreground active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               style={{ boxShadow: "0 0 0 2px rgba(255,255,255,0.3)" }}>
               <ShutterIcon />
             </button>
-            <button onClick={flipCamera}
-              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md">
+            <button onClick={flipCamera} aria-label="Trocar câmera"
+              className="w-12 h-12 rounded-full bg-white/15 border border-white/30 text-white flex items-center justify-center backdrop-blur-md hover:bg-white/25 active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <FlipIcon />
             </button>
           </div>
@@ -281,9 +387,9 @@ export default function ProductScanner() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => { setCapturedImage(null); startCamera(); }}
-                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 transition-colors">
-                Tirar outra
+                onClick={retake}
+                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                {source === "gallery" ? "Escolher outra" : "Tirar outra"}
               </button>
               <button onClick={analyzeImage}
                 className="flex-1 btn-primary flex items-center justify-center gap-2">
@@ -398,8 +504,8 @@ export default function ProductScanner() {
           {/* Ações */}
           <div className="flex gap-3">
             <button
-              onClick={() => { setCapturedImage(null); startCamera(); }}
-              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 transition-colors">
+              onClick={retake}
+              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
               <RetryIcon /> Novo scan
             </button>
             <button onClick={reset} className="flex-1 btn-primary flex items-center justify-center">

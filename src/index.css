@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -134,7 +134,7 @@
 @layer components {
   /* Soft Input Styling */
   .input-soft {
-    @apply rounded-xl border-2 border-input bg-white/80 px-5 py-4 text-base transition-all duration-200;
+    @apply rounded-xl border-2 border-input bg-white/80 px-5 py-4 text-base transition-[border-color,box-shadow] duration-200;
     @apply placeholder:text-muted-foreground/60;
     @apply focus:border-primary focus:ring-4 focus:ring-primary/20 focus:outline-none;
     @apply hover:border-primary/40;
@@ -143,8 +143,11 @@
   /* Primary Button Styling */
   .btn-primary {
     @apply rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground;
-    @apply transition-all duration-200 ease-out;
-    @apply hover:shadow-lg hover:brightness-105 active:scale-[0.98];
+    @apply transition-[transform,box-shadow,filter] duration-200;
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    @apply hover:brightness-105 active:scale-[0.98];
+    @apply hover:shadow-[0_1px_2px_hsl(var(--primary)/0.3),0_10px_24px_-10px_hsl(var(--primary)/0.8)];
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   /* Card with Soft Shadow */
@@ -168,6 +171,32 @@
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold;
     @apply bg-[hsl(var(--risk)/0.15)] text-[hsl(var(--risk-foreground))];
   }
+
+  /* Documentos legais (Política de Privacidade, Termos de Uso) */
+  .legal-doc {
+    @apply text-[16px] leading-[1.75] text-foreground/85;
+  }
+  .legal-doc h2 {
+    @apply font-display text-2xl font-bold tracking-[-0.02em] text-foreground mt-12 mb-3 scroll-mt-24;
+  }
+  .legal-doc h3 {
+    @apply text-base font-extrabold text-foreground mt-6 mb-2;
+  }
+  .legal-doc p { @apply mb-4; }
+  .legal-doc ul { @apply list-disc pl-6 mb-4 space-y-1.5 marker:text-primary; }
+  .legal-doc strong { @apply font-bold text-foreground; }
+  .legal-doc a {
+    @apply font-semibold text-[hsl(152_55%_32%)] dark:text-primary underline underline-offset-4 decoration-primary/50 rounded;
+    @apply hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary;
+  }
+  .legal-doc .table-wrap { @apply overflow-x-auto mb-6 rounded-2xl border border-border; }
+  .legal-doc table { @apply w-full text-sm border-collapse min-w-[560px]; }
+  .legal-doc th { @apply bg-secondary text-left font-bold text-foreground px-4 py-3; }
+  .legal-doc td { @apply px-4 py-3 border-t border-border align-top; }
+  .legal-doc .callout {
+    @apply rounded-2xl border border-caution/40 bg-caution/10 px-5 py-4 mb-4 text-caution-foreground;
+  }
+  .legal-doc .callout p:last-child { @apply mb-0; }
 
   /* Sidebar Active Link */
   .sidebar-link-active {
@@ -194,5 +223,16 @@
 
   .shadow-hover {
     box-shadow: var(--shadow-hover);
+  }
+
+  /* Textura de grão sutil (SVG noise) para superfícies com gradiente */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.07;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }

@@ -2,7 +2,7 @@
 titulo: Arquitetura do Sistema
 subtitulo: Visão completa da arquitetura de software do AlerGica — componentes, dados, integrações, segurança, implantação e evolução.
 categoria: Documento de Arquitetura
-versao: 1.0.1
+versao: 1.2.0
 atualizado: 12 de novembro de 2026
 publico: Arquitetos, CTOs e due diligence técnica
 classificacao: Confidencial
@@ -167,11 +167,14 @@ flowchart TB
 
 | Rota | Página | Acesso | Observação |
 |---|---|---|---|
-| `/` | `AuthPage` | Público | Login e cadastro; redireciona ao painel se já autenticado |
+| `/` | `AuthPage` | Público | Login, cadastro (com consentimentos LGPD) e recuperação de senha; `?modo=cadastro` abre no cadastro |
 | `/dashboard` | `Dashboard` | Autenticado | Módulos: Início, Remédios, Produtos, Restaurantes, Nutrição |
 | `/medication/:id` | `MedicationDetails` | Autenticado* | Detalhe, composição e alternativas seguras |
 | `/profile` | `ProfilePage` | Autenticado | Dados pessoais e bebês |
-| `/settings` | `SettingsPage` | Autenticado* | Preferências (conteúdo informativo nesta versão) |
+| `/settings` | `SettingsPage` | Autenticado | Privacidade e seus dados (LGPD) e preferências |
+| `/privacidade` | `PrivacyPolicyPage` | Público | Política de Privacidade |
+| `/termos` | `TermsPage` | Público | Termos de Uso |
+| `/redefinir-senha` | `ResetPasswordPage` | Link do e-mail | Criação de nova senha após "Esqueci minha senha" |
 | `*` | `NotFound` | Público | Página 404 |
 
 \* A página não redireciona sozinha quem não está logado; os dados continuam protegidos pela RLS do banco (a consulta retorna vazio). Ver seção 13.
@@ -217,7 +220,7 @@ O frontend usa o SDK `@supabase/supabase-js` para todas as operações de dados.
 | **PostgREST** | Leitura do catálogo, CRUD de perfil, bebês, sugestões, feedback e onboarding. |
 | **Funções SQL (RPC)** | `has_role` (verifica papel), `increment_medication_access` (contador de acessos), `handle_new_user` (gatilho de cadastro). |
 | **Gatilhos** | Criação automática de perfil e papel `user` ao cadastrar; atualização de `updated_at`. |
-| **Edge Functions** | `fetch-aplv-news` (notícias com cache de 24 h) e `create-admin-user` (criação de usuários e administradores; só pode ser chamada por um `admin` autenticado). |
+| **Edge Functions** | `fetch-aplv-news` (notícias com cache de 24 h), `delete-account` (exclusão da conta pelo titular) e `create-admin-user` (criação de usuários e administradores; só pode ser chamada por um `admin` autenticado). |
 | **Storage** | Previsto para imagens de solicitações de inclusão (`solicitado_inclusao.imagem_url`). |
 
 ### 6.2 API FastAPI (camada de servidor)
@@ -444,6 +447,7 @@ sequenceDiagram
 | Tabela | Leitura | Escrita |
 |---|---|---|
 | `profiles`, `babies`, `user_onboarding` | Somente o dono | Somente o dono |
+| `user_consents` | O dono e `admin` | Inserção pelo dono (sem alteração ou exclusão) |
 | `suggestions`, `feedback` | Somente o dono | Inserção pelo dono |
 | `user_roles` | O próprio usuário | Somente `admin` |
 | `medications`, `ingredients`, `allergen_groups`, `medication_ingredients` | Qualquer usuário autenticado | Somente `admin` |
@@ -464,7 +468,22 @@ Arquivos `.env` estão no `.gitignore`.
 
 ### 10.4 Privacidade e LGPD
 
-O sistema trata **dados pessoais sensíveis de saúde** (alergias, observações, dados de crianças), enquadrados no art. 11 da LGPD. A arquitetura já oferece isolamento por usuário via RLS. Para comercialização recomenda-se: termo de consentimento específico no cadastro, política de privacidade, registro das operações de tratamento, rotina de exclusão de conta e dados, e acordo de processamento de dados com os provedores (Supabase, Vercel, n8n e o provedor de IA usado no n8n).
+O sistema trata **dados pessoais sensíveis de saúde** (alergias, observações e dados de crianças), enquadrados nos arts. 11 e 14 da LGPD. Medidas implementadas:
+
+| Princípio / direito (LGPD) | Como o sistema atende |
+|---|---|
+| Consentimento específico e destacado (art. 11, I; art. 14, §1º) | Duas caixas obrigatórias no cadastro: Termos + Política e, em destaque, uso de dados de saúde (inclusive de crianças) |
+| Prova do consentimento (art. 8º, §2º) | Tipo, versão e data gravados em `user_metadata.lgpd_consents` e no histórico `user_consents` |
+| Necessidade / minimização (art. 6º, III) | Só nome, e-mail, senha, tipo de perfil e data de nascimento são obrigatórios; sexo, cidade, UF e profissão são opcionais; consultas de remédios não são ligadas ao usuário |
+| Proteção de crianças (art. 14) | Conta só para maiores de 18 anos (validado pela data de nascimento); dados de crianças inseridos pelo responsável |
+| Transparência (art. 9º) | Páginas públicas `/privacidade` e `/termos`; avisos antes de enviar foto ou texto à IA; links no login, no menu e em Configurações |
+| Acesso e portabilidade (art. 18, II e V) | "Baixar meus dados" gera um JSON com todos os dados da conta |
+| Correção (art. 18, III) | Edição em Meu Perfil |
+| Eliminação e revogação (art. 18, VI e IX; art. 8º, §5º) | "Excluir conta" chama a Edge Function `delete-account`, que apaga todos os dados e o usuário |
+| Encarregado (art. 41) | Contato exibido na Política e em Configurações (`src/config/legal.ts`) |
+| Segurança (art. 46) | HTTPS, senhas com hash, RLS por usuário, segredos só no servidor |
+
+Pendências para a comercialização: preencher os dados do controlador e do encarregado em `src/config/legal.ts`; revisão jurídica dos textos; acordos de tratamento de dados (DPA) com Supabase, Vercel, n8n e o provedor de IA; registro das operações de tratamento (art. 37) e relatório de impacto (RIPD, art. 38) por envolver dados sensíveis; apagar arquivos do Storage na exclusão de conta.
 
 ## 11. Implantação e operação
 
@@ -509,6 +528,8 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 |---|---|---|---|
 | A Edge Function `create-admin-user` aceitava chamadas de qualquer pessoa com a chave pública e podia criar administradores. | Crítica | A função valida o JWT de quem chama e exige o papel `admin` (`has_role`); responde 401 sem login válido e 403 para não administradores. | 1.0.1 |
 | Quando a análise de rótulo falhava, o scanner exibia um resultado de demonstração como se fosse real. | Alta | Falhas (rede, webhook ausente ou resposta sem veredito) levam a uma tela de erro com "Tentar novamente"; nenhum resultado é inventado. | 1.0.1 |
+| "Esqueci minha senha" não funcionava. | Média | Envio do link por e-mail (`resetPasswordForEmail`) e página `/redefinir-senha`. | 1.1.0 |
+| Estatísticas do perfil eram números fixos de exemplo. | Baixa | Bloco removido; o topo do perfil mostra dados reais (nome, tipo de perfil, data de cadastro e completude). | 1.2.0 |
 
 ### 13.2 Itens em aberto
 
@@ -517,13 +538,11 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | 1 | As migrações não reproduzem o banco de produção: a tabela `medications` em produção usa colunas em português (`nome_principal`, `composicao`…), enquanto a migração cria colunas em inglês (`name`, `risk_level`…). `products`, `restaurants` e `solicitado_inclusao` não têm migração. | **Alta** | Gerar migração de base a partir do banco atual (`supabase db dump`) e regenerar `types.ts`. |
 | 2 | A API FastAPI consulta as colunas em inglês e não funcionaria com o banco atual; também não há middleware de validação de JWT (o `python-jose` está instalado, mas não é usado). | Média | Ajustar ao esquema real e adicionar validação do JWT antes de colocar em uso. |
 | 3 | A URL do webhook do n8n fica no código do navegador; qualquer pessoa pode chamá-la e consumir créditos de IA. | Média | Chamar o n8n a partir do servidor, com autenticação e limite de uso. |
-| 4 | Rotas `/medication/:id` e `/settings` não redirecionam usuário deslogado (os dados seguem protegidos pela RLS). | Baixa | Criar um componente de rota protegida reutilizável. |
-| 5 | Estatísticas do perfil são números fixos de exemplo. | Baixa | Registrar histórico de consultas por usuário e calcular de verdade, ou ocultar o bloco. |
-| 6 | "Esqueci minha senha" ainda não funciona. | Média | Implementar `resetPasswordForEmail` e a tela de nova senha. |
-| 7 | O texto digitado na busca entra direto no filtro do PostgREST (`.or(...)`); vírgulas e parênteses podem quebrar a consulta. | Baixa | Escapar caracteres reservados ou usar uma RPC de busca. |
-| 8 | Cobertura de testes automatizados mínima (apenas um teste de exemplo). | Média | Testes unitários para `medToRisk`, `activeKeysOf` e `getSafeAlternatives`; testes E2E dos fluxos principais. |
-| 9 | O `README.md` descreve componentes e recursos de versões anteriores (ex.: importação JSON pelo admin). | Baixa | Apontar o README para esta documentação. |
-| 10 | "Suporte" no widget é gravado na tabela `suggestions` com o prefixo `[Suporte]`. | Baixa | Tabela ou canal próprio de atendimento. |
+| 4 | A rota `/medication/:id` não redireciona usuário deslogado (os dados seguem protegidos pela RLS). | Baixa | Criar um componente de rota protegida reutilizável. |
+| 5 | O texto digitado na busca entra direto no filtro do PostgREST (`.or(...)`); vírgulas e parênteses podem quebrar a consulta. | Baixa | Escapar caracteres reservados ou usar uma RPC de busca. |
+| 6 | Cobertura de testes automatizados mínima (apenas um teste de exemplo). | Média | Testes unitários para `medToRisk`, `activeKeysOf` e `getSafeAlternatives`; testes E2E dos fluxos principais. |
+| 7 | O `README.md` descreve componentes e recursos de versões anteriores (ex.: importação JSON pelo admin). | Baixa | Apontar o README para esta documentação. |
+| 8 | "Suporte" no widget é gravado na tabela `suggestions` com o prefixo `[Suporte]`. | Baixa | Tabela ou canal próprio de atendimento. |
 
 ## 14. Histórico de revisões
 
@@ -531,3 +550,5 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 |---|---|---|
 | 1.0.0 | 12/11/2026 | Primeira versão completa do documento de arquitetura. |
 | 1.0.1 | 12/11/2026 | Corrigidos os itens críticos de segurança (`create-admin-user`) e do scanner de produtos; nova seção 13.1 "Itens resolvidos". |
+| 1.1.0 | 12/11/2026 | Novas rotas (`/privacidade`, `/termos`, `/redefinir-senha`), Edge Function `delete-account`, tabela `user_consents` e seção 10.4 reescrita com as medidas de LGPD implementadas; recuperação de senha resolvida. |
+| 1.2.0 | 12/11/2026 | Estatísticas fictícias do perfil removidas (item resolvido na seção 13.1). |

@@ -162,6 +162,14 @@ const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps
               <p className="text-sm text-destructive mt-2">{error}</p>
             )}
 
+            <p className="text-xs text-muted-foreground leading-relaxed mt-3">
+              🔒 O texto é enviado ao nosso assistente de IA só para organizar seu perfil de alergias, conforme a{" "}
+              <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+                Política de Privacidade
+              </a>
+              .
+            </p>
+
             <button
               onClick={handleConfigureProfile}
               className="btn-primary w-full mt-5 flex items-center justify-center gap-2"

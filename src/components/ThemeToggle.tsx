@@ -1,46 +1,24 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { applySavedTheme, isDarkTheme, onThemeChange, setDarkTheme } from "@/lib/theme";
 
 const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Check for saved preference or system preference
-    const savedTheme = localStorage.getItem("theme");
-
-    // Só aplica dark se o usuário escolheu explicitamente — ignora preferência do SO
-    if (savedTheme === "dark") {
-      setIsDark(true);
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    applySavedTheme();
+    setIsDark(isDarkTheme());
+    return onThemeChange(setIsDark);
   }, []);
-
-  const toggleTheme = () => {
-    const newIsDark = !isDark;
-    setIsDark(newIsDark);
-    
-    if (newIsDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
 
   return (
     <button
-      onClick={toggleTheme}
-      className="p-2 rounded-xl hover:bg-sidebar-accent transition-colors"
+      onClick={() => setDarkTheme(!isDark)}
+      aria-label={isDark ? "Mudar para modo claro" : "Mudar para modo escuro"}
       title={isDark ? "Modo claro" : "Modo escuro"}
+      className="p-2 rounded-xl hover:bg-sidebar-accent active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      {isDark ? (
-        <Sun className="w-5 h-5 text-primary" />
-      ) : (
-        <Moon className="w-5 h-5 text-muted-foreground" />
-      )}
+      {isDark ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5 text-muted-foreground" />}
     </button>
   );
 };
