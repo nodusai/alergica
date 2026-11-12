@@ -46,9 +46,12 @@ export const medToRisk = (
 };
 
 /** Parse a JSON-array-in-text field into a clean string list. */
-export const parseTextField = (raw: string | null): string[] => {
-  if (!raw) return [];
-  const trimmed = raw.trim();
+export const parseTextField = (raw: unknown): string[] => {
+  if (raw === null || raw === undefined || raw === "") return [];
+  if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof raw === "object") return Object.values(raw).map((s) => String(s).trim()).filter(Boolean);
+  const trimmed = String(raw).trim();
+  if (!trimmed) return [];
   if (trimmed.startsWith("[")) {
     try {
       const arr = JSON.parse(trimmed);
@@ -124,6 +127,138 @@ export const getMedication = async (id: string): Promise<MedicationDetail> => {
     .single();
   if (error) throw error;
   return data as MedicationDetail;
+};
+
+// ---------------------------------------------------------------------------
+// Alternativas seguras: mesmos princípios ativos, sem derivados do leite
+// ---------------------------------------------------------------------------
+
+const normalizeName = (s: string) => {
+  let out = s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[®™]/g, "");
+  // Remove parênteses, inclusive aninhados: "(5,20 mg (equivale a 5 mg))"
+  for (let prev = ""; prev !== out; ) {
+    prev = out;
+    out = out.replace(/\([^()]*\)/g, " ");
+  }
+  return out
+    .replace(/\d+[.,]?\d*\s*(mg|g|ml|mcg|ui|%)(\/\s*\w+)?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+/** Sais, hidratação e formas farmacêuticas: não mudam o princípio ativo */
+const NOISE_WORDS = new RegExp(
+  "\\b(" +
+    [
+      "cloridrato", "dicloridrato", "bromidrato", "hemifumarato", "fumarato", "maleato", "besilato", "mesilato",
+      "succinato", "tartarato", "hemitartarato", "citrato", "acetato", "hiclato", "pamoato", "valerato",
+      "oxalato", "malato", "fosfato", "propionato", "dipropionato", "furoato", "xinafoato", "bissulfato", "nitrato",
+      "sodic[oa]", "potassic[oa]", "calcic[oa]", "magnesic[oa]", "dissodic[oa]",
+      "(?:mono|di|tri|sesqui|hemi)?-?h?idratad[oa]", "anidr[oa]",
+      "comprimidos?", "revestidos?", "capsulas?", "gotas", "solucao", "oral", "xarope", "suspensao", "injetavel",
+      "po", "para", "liberacao", "prolongada", "retard", "xr", "sr", "ap",
+    ].join("|") +
+    ")\\b",
+  "g",
+);
+
+const canonicalIngredient = (s: string) =>
+  s
+    // Prefixo de laboratório público: "furp-metoclopramida", "lfm-ziprasidona"
+    .replace(/^[a-z]{2,6}-(?=[a-z]{4,})/, "")
+    .replace(NOISE_WORDS, " ")
+    .replace(/^\s*de\s+|\s+de\s*$/g, " ")
+    .replace(/\s+de\s+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Conjunto de princípios ativos em forma canônica, ex.: "cafeina + paracetamol" */
+const activeKey = (s: string) =>
+  [
+    ...new Set(
+      normalizeName(s)
+        .split(/\s*\+\s*|\s*;\s*|\s*,\s*|\s+e\s+/)
+        .map(canonicalIngredient)
+        .filter(Boolean),
+    ),
+  ]
+    .sort()
+    .join(" + ");
+
+/** Princípios ativos do medicamento: do nome (genéricos) ou do início da composição (marcas). */
+export const activeKeysOf = (med: Pick<MedicationDetail, "nome_principal" | "composicao">): string[] => {
+  const keys = new Set<string>();
+  if (med.nome_principal) keys.add(activeKey(med.nome_principal));
+  const ativos = med.composicao?.split(/\.\s*Excipientes?:/i)[0]?.trim();
+  if (ativos) keys.add(activeKey(ativos));
+  return [...keys].filter(Boolean);
+};
+
+/** Padrão ILIKE que ignora acentos: troca vogais/ç por "_" (curinga de 1 caractere) */
+const accentInsensitive = (word: string) => word.replace(/[aeiouc]/g, "_");
+
+export type SafeAlternative = Pick<MedRow, "id" | "nome_principal" | "nome_alternativo" | "nome_completo">;
+
+/**
+ * Busca medicamentos seguros (sem leite) com exatamente os mesmos princípios ativos.
+ * Retorna no máximo um por fabricante, priorizando os mais consultados.
+ */
+export const getSafeAlternatives = async (
+  med: Pick<MedicationDetail, "id" | "nome_principal" | "composicao">,
+  limit = 6,
+): Promise<SafeAlternative[]> => {
+  const keys = activeKeysOf(med);
+  if (keys.length === 0) return [];
+
+  // Busca pela palavra mais longa de cada chave (a mais específica); a comparação exata é feita depois.
+  // Usa palavra solta porque o banco pode ter "de", sais etc. entre as palavras.
+  const terms = [
+    ...new Set(keys.map((k) => k.split(/[\s+]+/).filter(Boolean).sort((a, b) => b.length - a.length)[0])),
+  ].filter((t) => t && t.length >= 4);
+  const orFilter = terms
+    .flatMap((t) => {
+      const p = `%${accentInsensitive(t)}%`;
+      return [`nome_principal.ilike.${p}`, `nome_completo.ilike.${p}`, `composicao.ilike.${p}`];
+    })
+    .join(",");
+
+  const { data, error } = await supabase
+    .from("medications")
+    .select("id, nome_principal, nome_alternativo, nome_completo, composicao")
+    .eq("tem_risco_aplv", false)
+    .neq("id", med.id)
+    .or(orFilter)
+    .order("access_count", { ascending: false })
+    .limit(300);
+  if (error) throw error;
+
+  const wanted = new Set(keys);
+  const seenLabs = new Set<string>();
+  const result: SafeAlternative[] = [];
+  for (const row of data ?? []) {
+    const rowKeys = activeKeysOf(row as MedicationDetail);
+    if (!rowKeys.some((k) => wanted.has(k))) continue;
+    // Fabricante normalizado: ignora caixa, acentos, pontuação e sufixos (Ltda., S.A.)
+    const lab = normalizeName(row.nome_alternativo ?? row.id)
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\b(ltda|s ?a|eireli|me|epp)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (seenLabs.has(lab)) continue;
+    seenLabs.add(lab);
+    result.push({
+      id: row.id,
+      nome_principal: row.nome_principal ?? "",
+      nome_alternativo: row.nome_alternativo,
+      nome_completo: row.nome_completo,
+    });
+    if (result.length >= limit) break;
+  }
+  return result;
 };
 
 export const recordMedicationView = async (id: string) => {

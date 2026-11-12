@@ -26,8 +26,8 @@ const RiskBadge = ({ level, text }: RiskBadgeProps) => {
   const { className, icon: Icon } = config[level];
 
   return (
-    <span className={className}>
-      <Icon className="w-4 h-4" />
+    <span className={`${className} !text-xs !px-2.5 !py-1`}>
+      <Icon className="w-3.5 h-3.5" />
       {text}
     </span>
   );

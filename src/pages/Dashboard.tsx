@@ -37,11 +37,17 @@ const RISK_FILTER_LABELS: { value: RiskLevel | "all"; label: string }[] = [
   { value: "risk", label: "Risco" },
 ];
 
+const MED_LINK =
+  "group block rounded-2xl active:scale-[0.98] transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 const MedCardSkeleton = () => (
-  <div className="card-soft p-4 space-y-3">
-    <Skeleton className="h-5 w-3/4 rounded-lg" />
-    <Skeleton className="h-4 w-1/2 rounded-lg" />
-    <Skeleton className="h-6 w-1/3 rounded-full" />
+  <div className="rounded-2xl bg-card border border-border/60 p-4 md:p-5 flex gap-3">
+    <Skeleton className="w-11 h-11 rounded-xl shrink-0" />
+    <div className="flex-1 space-y-2">
+      <Skeleton className="h-5 w-3/4 rounded-lg" />
+      <Skeleton className="h-4 w-1/2 rounded-lg" />
+      <Skeleton className="h-6 w-28 rounded-full" />
+    </div>
   </div>
 );
 
@@ -172,34 +178,57 @@ const Dashboard = () => {
           <div className="w-full max-w-4xl lg:max-w-7xl mx-auto">
 
             {/* Header */}
-            <div className="mb-4 md:mb-6 lg:mb-10 animate-fade-in">
-              <div className="flex items-center justify-between mb-3 md:mb-4 lg:mb-6 gap-3">
-                <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1 rounded-md bg-card">
+            <div className="mb-8 md:mb-10 animate-fade-in">
+              <div className="flex items-center gap-3 mb-4 lg:hidden">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Abrir menu"
+                  className="p-2 rounded-xl bg-card border border-border/60 hover:bg-secondary active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
                   <Menu className="w-5 h-5 text-foreground" />
                 </button>
-                <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground text-center pr-2 mr-2 flex-1">
-                  Olá, {userName}! 👋
-                </h2>
               </div>
 
-              {(activeModule === "inicio" || activeModule === "medicamentos") && (
-                <div className="relative">
-                  <Search className="absolute left-3 md:left-4 lg:left-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={
-                      activeModule === "medicamentos"
-                        ? "Buscar medicamento..."
-                        : "Qual medicamento vamos conferir hoje, mamãe?"
-                    }
-                    className="w-full py-3 md:py-4 lg:py-5 px-8 md:px-8 lg:px-10 text-sm md:text-base lg:text-lg rounded-xl md:rounded-2xl border-2 border-input bg-card shadow-soft transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/20 focus:outline-none placeholder:text-muted-foreground/60"
-                  />
-                  {searching && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  )}
+              {activeModule === "inicio" || activeModule === "medicamentos" ? (
+                <div className="relative overflow-hidden rounded-3xl border border-primary/15 px-5 py-6 md:px-8 md:py-8 bg-[radial-gradient(120%_120%_at_0%_0%,hsl(var(--primary)/0.16)_0%,transparent_55%),radial-gradient(90%_120%_at_100%_100%,hsl(var(--safe)/0.10)_0%,transparent_60%)] bg-card shadow-[0_1px_2px_hsl(var(--primary)/0.08),0_16px_40px_-20px_hsl(var(--primary)/0.45)]">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em] leading-tight">
+                    Olá, {userName}! 👋
+                  </h2>
+                  <p className="text-sm md:text-base text-muted-foreground mt-1.5 mb-5 md:mb-6 leading-relaxed max-w-xl">
+                    {activeModule === "medicamentos"
+                      ? "Encontre um medicamento e veja se ele contém derivados do leite."
+                      : "Digite o nome do remédio para saber se ele é seguro para quem tem APLV."}
+                  </p>
+
+                  <div className="relative">
+                    <Search className="absolute left-4 md:left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary pointer-events-none" />
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      aria-label="Buscar medicamento"
+                      placeholder={
+                        activeModule === "medicamentos"
+                          ? "Buscar medicamento..."
+                          : "Ex.: dipirona, amoxicilina, ibuprofeno"
+                      }
+                      className="w-full py-4 md:py-[18px] pl-12 md:pl-14 pr-12 text-base md:text-lg rounded-2xl border-2 border-transparent bg-background/90 shadow-[0_1px_2px_hsl(160_40%_15%/0.06),0_6px_16px_-8px_hsl(160_40%_15%/0.15)] transition-colors duration-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20 placeholder:text-muted-foreground/60"
+                    />
+                    {searching && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </div>
+
+                  <ul className="flex flex-wrap gap-x-4 gap-y-2 mt-4 text-xs md:text-[13px] text-muted-foreground" aria-label="Legenda dos resultados">
+                    <li className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-safe" />Seguro: sem leite</li>
+                    <li className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-caution" />Atenção: pode ter traços</li>
+                    <li className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-risk" />Risco: contém leite</li>
+                  </ul>
                 </div>
+              ) : (
+                <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-[-0.03em]">
+                  Olá, {userName}! 👋
+                </h2>
               )}
             </div>
 
@@ -208,10 +237,17 @@ const Dashboard = () => {
               <>
                 {!searchQuery.trim() && <APLVInfoCarousel />}
                 <section className="animate-fade-in" style={{ animationDelay: "0.15s" }}>
-                  <h3 className="text-base md:text-lg font-bold text-foreground mb-3 md:mb-4 lg:mb-5">
-                    {sectionTitle}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+                  <div className="mb-4 md:mb-5">
+                    <h3 className="text-lg md:text-xl font-extrabold text-foreground tracking-[-0.02em]">
+                      {sectionTitle}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {searchQuery.trim()
+                        ? `${displayMeds.length} resultado${displayMeds.length === 1 ? "" : "s"} para "${searchQuery.trim()}"`
+                        : "Os medicamentos que as famílias mais consultam."}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {loadingPopular && !searchQuery.trim()
                       ? Array.from({ length: 6 }).map((_, i) => <MedCardSkeleton key={i} />)
                       : displayMeds.map((med, index) => (
@@ -219,6 +255,7 @@ const Dashboard = () => {
                             to={`/medication/${med.id}`}
                             key={med.id}
                             style={{ animationDelay: `${0.05 * index}s` }}
+                            className={MED_LINK}
                           >
                             <MedicationCard
                               name={med.nome_principal}
@@ -252,7 +289,8 @@ const Dashboard = () => {
                       <button
                         key={f.value}
                         onClick={() => setRiskFilter(f.value)}
-                        className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all duration-150 ${
+                        aria-pressed={riskFilter === f.value}
+                        className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           riskFilter === f.value
                             ? "bg-primary text-primary-foreground border-primary"
                             : "bg-card text-muted-foreground border-border hover:border-primary/50"
@@ -262,7 +300,7 @@ const Dashboard = () => {
                       </button>
                     ))}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {isLoading
                       ? Array.from({ length: 3 }).map((_, i) => <MedCardSkeleton key={i} />)
                       : filteredMeds.map((med, index) => (
@@ -270,6 +308,7 @@ const Dashboard = () => {
                             to={`/medication/${med.id}`}
                             key={med.id}
                             style={{ animationDelay: `${0.05 * index}s` }}
+                            className={MED_LINK}
                           >
                             <MedicationCard
                               name={med.nome_principal}

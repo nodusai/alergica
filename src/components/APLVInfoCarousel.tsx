@@ -11,67 +11,111 @@ import {
 } from "@/components/ui/carousel";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { getRecentStudies, type Study } from "@/services/studies";
 
 type Slide = {
   titulo: string;
   mensagem: string;
   referencia: string;
-  url?: string;
-  isNews?: boolean;
+  url: string;
+  /** Etiqueta exibida acima do título */
+  tag: string;
+  isStudy?: boolean;
 };
 
-const aplvInfoData = [
+/**
+ * Conteúdo educativo fixo. Cada item resume uma fonte real e verificável
+ * (diretriz, consenso, norma ou estudo publicado) e linka para ela.
+ */
+const aplvInfoData: Slide[] = ([
   {
-    titulo: "Medicamentos podem conter proteína do leite",
-    mensagem: "Cerca de 23% dos medicamentos contêm lactose ou derivados do leite como excipientes. Sempre verifique a composição dos remédios com seu médico ou farmacêutico antes de administrar ao bebê ou consumir durante a amamentação.",
-    referencia: "Estudo português - Excipientes presentes em medicamentos e alergia à proteína do leite de vaca (RCAAP, Portugal)"
+    titulo: "Medicamentos podem ter derivados do leite",
+    mensagem:
+      "Um levantamento publicado em 2024 encontrou excipientes derivados do leite (como lactose) em 62,6% dos antiasmáticos e 39% dos anti-inflamatórios analisados. Confira a bula e consulte o farmacêutico.",
+    referencia: "Scientific Reports, 2024 — Risks of dairy derived excipients in medications",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC11228012/",
+  },
+  {
+    titulo: "Lactose pode vir contaminada com proteína do leite",
+    mensagem:
+      "A lactose usada em remédios pode conter traços de proteína do leite. Há relatos de reações com inaladores em pó, vacina oral contra pólio e probióticos em pessoas com APLV.",
+    referencia: "Annals of Medicine, 2021 — Milk related excipients in medications",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8480826/",
   },
   {
     titulo: "A maioria das crianças supera a APLV",
-    mensagem: "Cerca de 50% dos bebês com APLV melhoram após 1 ano, e mais de 75% superam a alergia até os 3 anos de idade. Mantenha o acompanhamento médico para avaliar a reintrodução segura do leite.",
-    referencia: "Nestlé Health Science Brasil e CONITEC - Ministério da Saúde"
+    mensagem:
+      "Grande parte das crianças desenvolve tolerância nos primeiros anos de vida. A reintrodução do leite deve ser testada periodicamente, sempre com acompanhamento médico.",
+    referencia: "Consenso Brasileiro sobre Alergia Alimentar 2018 — SBP e ASBAI",
+    url: "https://www.sbp.com.br/imprensa/detalhe/nid/sbp-e-asbai-publicam-atualizacao-do-consenso-brasileiro-sobre-alergia-alimentar",
   },
   {
-    titulo: "Mãe que amamenta também precisa fazer dieta de exclusão",
-    mensagem: "Se o bebê tem APLV e é amamentado, a mãe deve eliminar leite e derivados da sua alimentação, pois pequenas quantidades da proteína podem passar pelo leite materno. A suplementação de cálcio e vitamina D é essencial.",
-    referencia: "CONITEC 2022 e Clínica Pró-Saúde"
-  },
-  {
-    titulo: "Cuidados em festas e escolas são essenciais",
-    mensagem: "Sempre informe professores, cuidadores e responsáveis por festas sobre a APLV do seu filho. Leve alimentos seguros para a criança e oriente que ela não deve aceitar comida de outras pessoas sem sua autorização.",
-    referencia: "Alergiaaoleitedevaca.com.br e Pediatria Descomplicada"
-  },
-  {
-    titulo: "APLV não é o mesmo que intolerância à lactose",
-    mensagem: "APLV é uma reação do sistema imunológico às proteínas do leite, enquanto intolerância à lactose é a dificuldade de digerir o açúcar do leite. São condições diferentes com tratamentos distintos.",
-    referencia: "Alergiaaoleitedevaca.com.br e Nestlé Health Science"
-  },
-  {
-    titulo: "Atenção aos rótulos: leite pode estar escondido",
-    mensagem: "Leite e derivados podem aparecer nos rótulos como: caseína, lactoglobulina, lactoalbumina, soro de leite, whey protein. Sempre leia os rótulos completos e evite produtos com 'pode conter traços de leite'.",
-    referencia: "Clínica Pró-Saúde e Material Danone Nutricia"
-  },
-  {
-    titulo: "Contaminação cruzada é um risco real",
-    mensagem: "Utensílios, tábuas de corte e até máquinas industriais podem conter traços de leite. Em casa, separe utensílios. Em padarias e supermercados, peça para fatiar alimentos longe de queijos e derivados.",
-    referencia: "Pediatria Descomplicada"
+    titulo: "Mãe que amamenta faz a dieta de exclusão",
+    mensagem:
+      "Quando o bebê com APLV é amamentado, a mãe deve excluir leite e derivados da própria dieta. Nesse caso, recomenda-se suplementação de cálcio e vitamina D para a mãe.",
+    referencia: "Consenso Brasileiro sobre Alergia Alimentar 2018 — Parte 2 (SBP/ASBAI)",
+    url: "https://www.sbp.com.br/flip/consenso-alergia-alimentar-parte-02/21/",
   },
   {
     titulo: "Sintomas podem ser imediatos ou tardios",
-    mensagem: "As reações podem surgir em minutos (urticária, vômitos, até choque anafilático) ou dias depois (cólicas, diarreia, sangue nas fezes). Conheça os sintomas do seu filho e mantenha medicações de emergência sempre à mão.",
-    referencia: "Alergiaaoleitedevaca.com.br e CONITEC"
+    mensagem:
+      "Nas reações mediadas por IgE, os sintomas aparecem em minutos e podem chegar à anafilaxia. Nas não mediadas por IgE, surgem horas ou dias depois, com sintomas gastrointestinais, por exemplo.",
+    referencia: "Consenso Brasileiro sobre Alergia Alimentar 2018 — Parte 1 (SBP/ASBAI)",
+    url: "https://portaldeboaspraticas.iff.fiocruz.br/biblioteca/consenso-brasileiro-sobre-alergia-alimentar-2018-parte-1-etiopatogenia-clinica",
   },
   {
-    titulo: "Cosméticos também podem conter leite",
-    mensagem: "Sabonetes, shampoos e cremes podem ter proteínas do leite na composição. Para crianças com reações cutâneas, verifique sempre os rótulos de produtos de higiene e beleza.",
-    referencia: "Clínica Pró-Saúde e Neocenter"
+    titulo: "Leia os avisos de alergênicos no rótulo",
+    mensagem:
+      "No Brasil, alimentos embalados devem informar \"ALÉRGICOS: CONTÉM LEITE\" ou \"PODE CONTER LEITE\" (risco de contaminação cruzada). Para APLV, os dois avisos indicam que o produto deve ser evitado.",
+    referencia: "Anvisa — Rotulagem de alimentos alergênicos (RDC 26/2015, atualizada pela RDC 727/2022)",
+    url: "https://bibliotecadigital.anvisa.gov.br/jspui/bitstream/anvisa/213/1/Rotulagem%20de%20alimentos%20alerg%c3%aanicos_5ed_2017.pdf",
   },
   {
-    titulo: "Aleitamento materno pode continuar com APLV",
-    mensagem: "O leite materno é a melhor opção mesmo com APLV. A mãe deve seguir dieta de exclusão rigorosa, mas pode e deve continuar amamentando. O leite materno oferece proteção e nutrição ideal para o bebê.",
-    referencia: "CONITEC 2022 e Ministério da Saúde"
-  }
-];
+    titulo: "APLV não é intolerância à lactose",
+    mensagem:
+      "Intolerância à lactose é a dificuldade de digerir o açúcar do leite. APLV é uma reação do sistema imunológico à proteína. Produtos \"zero lactose\" continuam tendo proteína do leite e não são seguros para APLV.",
+    referencia: "Anvisa — Perguntas e respostas sobre rotulagem de lactose (2017)",
+    url: "https://bibliotecadigital.anvisa.gov.br/jspui/bitstream/anvisa/214/1/Rotulagem%20de%20lactose_2017.pdf",
+  },
+  {
+    titulo: "Leite de cabra não é alternativa",
+    mensagem:
+      "A diretriz internacional da World Allergy Organization não recomenda leite de outros mamíferos (como cabra ou ovelha) na APLV, por causa da reatividade cruzada e de questões nutricionais.",
+    referencia: "WAO DRACMA Guideline, atualização XVI — WAO Journal, 2024",
+    url: "https://doi.org/10.1016/j.waojou.2024.100931",
+  },
+  {
+    titulo: "Qual fórmula usar quando não há amamentação",
+    mensagem:
+      "Para bebês com APLV que não são amamentados, a diretriz da WAO sugere fórmula extensamente hidrolisada (ou hidrolisada de arroz) como primeira opção. As de aminoácidos e de soja vêm como segunda e terceira opções.",
+    referencia: "WAO DRACMA Guideline, atualização XII — WAO Journal, 2024",
+    url: "https://doaj.org/article/285a6288c5ed4634bb1fb844db9e157c",
+  },
+  {
+    titulo: "O SUS oferece fórmulas para APLV",
+    mensagem:
+      "Desde 2018, fórmulas à base de soja, extensamente hidrolisadas e de aminoácidos foram incorporadas ao SUS para crianças de 0 a 24 meses com APLV. Procure a unidade de saúde com a prescrição.",
+    referencia: "CONITEC/Ministério da Saúde — Portaria SCTIE nº 67/2018",
+    url: "https://www.gov.br/conitec/pt-br/midias/relatorios/2018/recomendacao/relatorio_formulasnutricionais_aplv.pdf",
+  },
+] satisfies Omit<Slide, "tag">[]).map((s) => ({ ...s, tag: "Fonte científica" }));
+
+const formatDate = (iso?: string | null) =>
+  iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "";
+
+const CATEGORY_LABEL: Record<Study["category"], { tag: string; tema: string }> = {
+  formulas: { tag: "Estudo · Fórmulas", tema: "fórmulas infantis para APLV" },
+  medicamentos: { tag: "Estudo · Medicamentos", tema: "medicamentos e vacinas em pessoas com APLV" },
+};
+
+const studyToSlide = (s: Study): Slide => ({
+  titulo: s.title,
+  mensagem: `Sobre ${CATEGORY_LABEL[s.category].tema}${s.journal ? `. Revista ${s.journal}` : ""}. Artigo em inglês.`,
+  referencia: ["PubMed", formatDate(s.publishedAt), s.translated ? "tradução automática" : ""].filter(Boolean).join(" · "),
+  url: s.url,
+  tag: CATEGORY_LABEL[s.category].tag,
+  isStudy: true,
+});
 
 const APLVInfoCarousel = () => {
   const [api, setApi] = useState<CarouselApi>();
@@ -81,85 +125,13 @@ const APLVInfoCarousel = () => {
   const [refreshing, setRefreshing] = useState(false);
   const { isAdmin } = useAuth();
 
-  /** Normaliza artigos brutos da NewsAPI para o formato Slide */
-  const normalizeArticles = (articles: any[]): Slide[] =>
-    articles
-      .filter((a: any) => a.url && a.title && !a.title.includes("[Removed]"))
-      .slice(0, 10)
-      .map((a: any) => ({
-        titulo: a.title,
-        mensagem: a.description ?? "",
-        referencia: `${a.source?.name ?? a.source ?? ""} · ${a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("pt-BR") : ""}`,
-        url: a.url,
-        isNews: true,
-      }));
-
-  /** Fallback: chama NewsAPI direto via proxy Vite quando o backend Python está offline */
-  const fetchNewsDirect = async (): Promise<Slide[]> => {
-    const apiKey = import.meta.env.VITE_NEWS_API_KEY as string | undefined;
-    if (!apiKey) return [];
-
-    const queries = [
-      { q: "APLV bebê leite", language: "pt" },
-      { q: "MSPI baby milk allergy", language: "en" },
-    ];
-
-    const seen = new Set<string>();
-    const articles: any[] = [];
-
-    for (const q of queries) {
-      const params = new URLSearchParams({
-        q: q.q,
-        language: q.language,
-        sortBy: "publishedAt",
-        pageSize: "5",
-        apiKey,
-      });
-      try {
-        const res = await fetch(`/newsapi/v2/everything?${params}`);
-        if (!res.ok) continue;
-        const data = await res.json();
-        for (const a of data.articles ?? []) {
-          if (a.url && !seen.has(a.url)) {
-            seen.add(a.url);
-            articles.push(a);
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    return normalizeArticles(articles);
-  };
-
   const fetchNews = async () => {
     try {
-      // 1ª tentativa: backend Python
-      const res = await fetch("/api/news");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const newsSlides: Slide[] = data.map((a: any) => ({
-            titulo: a.title,
-            mensagem: a.description ?? "",
-            referencia: `${a.source} · ${new Date(a.publishedAt).toLocaleDateString("pt-BR")}`,
-            url: a.url,
-            isNews: true,
-          }));
-          setSlides([...newsSlides, ...aplvInfoData]);
-          return;
-        }
-      }
-
-      // 2ª tentativa: NewsAPI direto via proxy Vite
-      const directSlides = await fetchNewsDirect();
-      if (directSlides.length > 0) {
-        setSlides([...directSlides, ...aplvInfoData]);
-      }
+      const studies = await getRecentStudies();
+      if (studies.length > 0) setSlides([...studies.map(studyToSlide), ...aplvInfoData]);
     } catch (err) {
-      console.error("fetchNews error", err);
-      // mantém slides estáticos como fallback final
+      console.error("Erro ao buscar estudos:", err);
+      // mantém o conteúdo educativo como fallback
     }
   };
 
@@ -176,116 +148,94 @@ const APLVInfoCarousel = () => {
   useEffect(() => {
     if (!api) return;
 
-    setCount(api.scrollSnapList().length);
-    setCurrent(api.selectedScrollSnap());
-
-    api.on("select", () => {
+    const update = () => {
+      setCount(api.scrollSnapList().length);
       setCurrent(api.selectedScrollSnap());
-    });
+    };
+    update();
+    api.on("select", update);
+    api.on("reInit", update);
+    return () => {
+      api.off("select", update);
+      api.off("reInit", update);
+    };
   }, [api]);
 
   return (
-    <section className="mb-6 md:mb-8 lg:mb-10 animate-fade-in" style={{ animationDelay: "0.05s" }}>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-5 gap-2 md:gap-0">
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <BookOpen className="w-3.5 h-3.5 md:w-5 md:h-5 text-primary" />
+    <section className="mb-10 md:mb-12 animate-fade-in" style={{ animationDelay: "0.05s" }} aria-labelledby="estudos-titulo">
+      <Carousel setApi={setApi} opts={{ align: "start", loop: true }} className="w-full">
+        <div className="flex items-end justify-between gap-4 mb-4 md:mb-5">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <BookOpen className="w-5 h-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h3 id="estudos-titulo" className="text-lg md:text-xl font-extrabold text-foreground tracking-[-0.02em]">
+                Estudos e informações
+              </h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Pesquisas recentes sobre fórmulas e medicamentos na APLV.
+              </p>
+            </div>
           </div>
-          <h3 className="text-xs md:text-base lg:text-lg font-bold text-foreground">
-            Notícias
-          </h3>
+          <div className="flex items-center gap-2 shrink-0">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refreshNews}
+                disabled={refreshing}
+                className="h-8 w-8 p-0"
+                aria-label="Atualizar estudos"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              </Button>
+            )}
+            <span className="hidden sm:inline text-xs font-semibold text-muted-foreground tabular-nums mr-1" aria-live="polite">
+              {current + 1} / {count}
+            </span>
+            <CarouselPrevious className="static translate-y-0 h-9 w-9 bg-card border-border hover:bg-primary/10 hover:border-primary/40 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary" />
+            <CarouselNext className="static translate-y-0 h-9 w-9 bg-card border-border hover:bg-primary/10 hover:border-primary/40 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary" />
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground self-end md:self-auto">
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refreshNews}
-              disabled={refreshing}
-              className="h-6 w-6 p-0"
-            >
-              <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          )}
-          <span>{current + 1}</span>
-          <span>/</span>
-          <span>{count}</span>
-        </div>
-      </div>
 
-      <Carousel
-        setApi={setApi}
-        opts={{
-          align: "start",
-          loop: true,
-        }}
-        className="w-full"
-      >
-        <CarouselContent className="-ml-2 md:-ml-4">
+        <CarouselContent className="-ml-3 md:-ml-4">
           {slides.map((item, index) => (
-            <CarouselItem key={index} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3">
-              {item.url ? (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block h-full group"
-                >
-                  <Card className="card-soft h-full border-primary/10 bg-gradient-to-br from-card to-secondary/30 cursor-pointer transition-all duration-200 group-hover:border-primary/30 group-hover:shadow-md">
-                    <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col h-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1">Notícia</span>
-                      <h4 className="text-sm md:text-base lg:text-lg font-bold text-foreground mb-2 md:mb-3 line-clamp-2 group-hover:text-primary transition-colors">
-                        {item.titulo}
-                      </h4>
-                      <p className="text-muted-foreground text-xs md:text-sm leading-relaxed mb-3 md:mb-4 flex-1 line-clamp-4">
-                        {item.mensagem}
-                      </p>
-                      <div className="pt-3 md:pt-4 border-t border-border/50 flex items-end justify-between gap-2">
-                        <p className="text-xs text-muted-foreground/80 italic">
-                          🗞️ {item.referencia}
-                        </p>
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0 text-primary/50 group-hover:text-primary transition-colors" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </a>
-              ) : (
-                <Card className="card-soft h-full border-primary/10 bg-gradient-to-br from-card to-secondary/30">
-                  <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col h-full">
-                    <h4 className="text-sm md:text-base lg:text-lg font-bold text-foreground mb-2 md:mb-3 line-clamp-2">
+            <CarouselItem key={item.url + index} className="pl-3 md:pl-4 basis-[88%] sm:basis-1/2 lg:basis-1/3">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block h-full group rounded-2xl active:scale-[0.98] transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <Card className="h-full rounded-2xl border-border/60 bg-card shadow-[0_1px_2px_hsl(var(--primary)/0.06),0_8px_24px_-12px_hsl(160_40%_15%/0.12)] transition-colors duration-200 group-hover:border-primary/40">
+                  <CardContent className="p-5 flex flex-col h-full">
+                    <span
+                      className={`self-start inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] mb-3 ${
+                        item.isStudy ? "bg-primary/15 text-primary-foreground" : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {item.tag}
+                    </span>
+                    <h4 className="text-[15px] md:text-base font-bold text-foreground leading-snug tracking-[-0.01em] mb-2 line-clamp-3">
                       {item.titulo}
                     </h4>
-                    <p className="text-muted-foreground text-xs md:text-sm leading-relaxed mb-3 md:mb-4 flex-1 line-clamp-4">
+                    <p className="text-muted-foreground text-[13px] leading-relaxed flex-1 line-clamp-3">
                       {item.mensagem}
                     </p>
-                    <div className="pt-3 md:pt-4 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground/80 italic">
-                        📚 {item.referencia}
-                      </p>
+                    <div className="pt-3 mt-4 border-t border-border/50 flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground line-clamp-1">{item.referencia}</p>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-primary-foreground/80 group-hover:text-foreground shrink-0">
+                        Ler
+                        <ExternalLink className="w-3.5 h-3.5 transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
-              )}
+              </a>
             </CarouselItem>
           ))}
         </CarouselContent>
-        <div className="flex items-center justify-center gap-2 mt-6">
-          <CarouselPrevious className="static translate-y-0 bg-card border-primary/20 hover:bg-primary/10 hover:border-primary/40" />
-          <div className="flex gap-1.5">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === current
-                    ? "bg-primary w-6"
-                    : "bg-primary/30 hover:bg-primary/50"
-                }`}
-                onClick={() => api?.scrollTo(index)}
-              />
-            ))}
-          </div>
-          <CarouselNext className="static translate-y-0 bg-card border-primary/20 hover:bg-primary/10 hover:border-primary/40" />
-        </div>
       </Carousel>
     </section>
   );
