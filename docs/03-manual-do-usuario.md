@@ -2,7 +2,7 @@
 titulo: Manual do Usuário
 subtitulo: Guia completo para usar o AlerGica no dia a dia — da criação da conta à consulta de medicamentos e produtos seguros para quem tem APLV.
 categoria: Manual do Usuário
-versao: 1.10.0
+versao: 1.11.0
 atualizado: 12 de novembro de 2026
 publico: Famílias, pessoas alérgicas e profissionais de saúde
 classificacao: Uso público
@@ -271,6 +271,14 @@ Contas com papel de **administrador** veem no menu lateral o item **Mensagens**,
 - Mude a situação tocando em **Nova**, **Em andamento** ou **Resolvida**.
 - **Responder** abre seu programa de e-mail já com o endereço da pessoa; o botão ao lado **copia o e-mail**.
 
+**Várias bulas de uma vez:** no menu, **Bulas em lote**. Baixe os PDFs no Bulário da Anvisa (de preferência a bula do profissional, que traz a composição completa) e arraste todos para a página. O AlerGica lê cada bula e descobre o remédio pelo nome, laboratório e princípio ativo:
+- **Identificada** (verde): já vem marcada, inclusive as outras apresentações do mesmo produto;
+- **Confirme** (amarelo): marque o remédio certo entre as sugestões;
+- **Não identificada** (vermelho): busque o remédio pelo nome ou laboratório;
+- **Já guardada**: o mesmo arquivo já está no sistema.
+
+Confira e toque em **Guardar**. Bulas diferentes das guardadas deixam o remédio em **Atenção** até a análise ser conferida.
+
 **Atualizar uma bula:** na página do remédio, quadro **Bula oficial**, área **Administrador**: baixe o PDF atual no Bulário da Anvisa e toque em **Enviar nova versão da bula (PDF)**. Se o arquivo for igual ao guardado, nada muda. Se for diferente, o remédio fica em **Atenção** para todos até a composição ser revisada; depois toque em **Análise conferida — liberar classificação**.
 
 A lista atualiza sozinha a cada minuto (ou toque em **Atualizar**). A página mostra apenas nome e e-mail de quem escreveu — os dados de saúde dos usuários continuam privados.
@@ -351,3 +359,4 @@ Sim. Basta entrar com o mesmo e-mail e senha.
 | 1.8.0 | 12/11/2026 | Nova seção 15.1: página Mensagens para administradores (Suporte, Sugestões e Feedback). |
 | 1.9.0 | 12/11/2026 | Seção 9.3: botão "Buscar no Bulário da Anvisa" para quando o link do PDF da bula expira ou não existe. |
 | 1.10.0 | 12/11/2026 | Seção 9.3 reescrita (Ver bula no app, datas, "análise em revisão"); seção 15.1: administrador atualiza a bula. |
+| 1.11.0 | 12/11/2026 | Seção 15.1: envio de várias bulas de uma vez com identificação automática do remédio. |

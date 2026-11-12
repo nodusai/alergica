@@ -2,7 +2,7 @@
 titulo: Documentação Técnica do Sistema
 subtitulo: Referência para desenvolvimento, implantação e manutenção do AlerGica — ambiente, configuração, dicionário de dados, APIs, serviços e componentes.
 categoria: Documentação Técnica
-versao: 1.11.0
+versao: 1.12.0
 atualizado: 12 de novembro de 2026
 publico: Desenvolvedores e equipe de operação
 classificacao: Confidencial
@@ -561,6 +561,17 @@ As listas leem `bula_reanalisar` junto com o catálogo; se a coluna ainda não e
 | `--from-urls` | Para remédios sem cópia, baixa o `arquivo_url` (é a versão já analisada: não exige nova análise). Links expirados/bloqueados aparecem como falha |
 | `--dry-run`, `--limit n`, `--delay ms` | Simulação, limite de itens, pausa entre downloads (padrão 1500 ms) |
 
+**Envio em lote no app** (`/admin/bulas`, `AdminBulasPage`):
+
+| Peça | Descrição |
+|---|---|
+| `services/pdfText.ts` → `extractPdfText(file)` | Texto da 1ª página (`head`) e de até 40 páginas (`full`) com `pdfjs-dist` 4.10.38, carregado sob demanda (worker em chunk separado). PDF escaneado → texto vazio |
+| `services/bulas.ts` → `getBulaCatalog()` | Catálogo (id, nome, laboratório, `activeKeysOf`, `bula_sha256`) em lotes de 1000; sem a coluna de hash, segue sem ela |
+| `services/bulas.ts` → `sha256Hex(file)` | SHA-256 do PDF com `crypto.subtle`; quando o app é aberto fora de https/localhost (ex.: pelo IP da rede) o navegador não oferece `crypto.subtle` e usa `sha256Js` (implementação própria, testada contra o SHA-256 padrão em `services/bulas.test.ts`). A página não usa `crypto.randomUUID` pelo mesmo motivo e mostra na tela qualquer erro de leitura |
+| `lib/bulaMatch.ts` → `matchBula(full, head, nomeArquivo, sha, catálogo)` | Retorna `confidence` (`igual`, `alta`, `media`, `baixa`), até 8 candidatos com pontuação e motivos, e os pré-selecionados. Pesos: nome na capa 45 / no texto 15, laboratório 30, princípios ativos 20, nome do arquivo 5; nome genérico (= princípio ativo) vale 0,5 se a bula não se declarar genérico; sem o nome no texto não é candidato. `alta` = ≥ 75 e margem ≥ 15 sobre o próximo produto. Testes em `lib/bulaMatch.test.ts` |
+
+Fluxo da página: lê os PDFs um a um (hash + texto + identificação), o administrador confere/ajusta (busca por nome ou laboratório para escolher outro remédio, um PDF pode ir para várias apresentações) e **Guardar** chama `uploadBula` para cada par PDF × remédio, mostrando o resultado (guardada, nova versão em revisão, sem mudança, erro).
+
 Ex.: `SUPABASE_SERVICE_ROLE_KEY=… npm run bulas:sync -- --from-urls --dry-run`. O fluxo de análise (n8n) deve gravar `bula_reanalisar = false` ao concluir uma nova análise.
 
 ### 7.6 `services/studies.ts`
@@ -646,6 +657,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 | `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error`; foto pela câmera ou da galeria (imagem até 10 MB); no resultado, a foto fica ao lado do veredito e abre ampliada em um `Dialog` |
 | `BabyManager` | Lista, inclusão e remoção de bebês, com cálculo de idade |
 | `ChatWidget` | Botão flutuante do mascote: Suporte, Sugestão e Feedback |
+| `AdminBulasPage` | Página `/admin/bulas`: área de arrastar PDFs, cartões por arquivo com nível de confiança, candidatos marcáveis, busca de outro remédio e barra fixa "Guardar" |
 | `BulaViewer` | Diálogo com o PDF da bula guardada (`iframe`; no Android abre no leitor de PDF), com Baixar e Abrir em nova aba |
 | `AdminMessagesPage` | Página `/admin/mensagens`: contadores por situação (também filtram), abas por tipo, busca por texto/nome/e-mail, troca de situação com atualização otimista, copiar e-mail e responder (`mailto:`); atualiza a cada 60 s |
 | `ThemeToggle` | Botão de tema da barra lateral; usa `lib/theme.ts` e fica sincronizado com o seletor de Configurações |
@@ -759,3 +771,4 @@ O gerador (`scripts/build-docs.mjs`) monta capa, sumário e diagramas Mermaid e 
 | 1.9.0 | 12/11/2026 | Alergias por tipo: colunas `food_allergies`/`drug_allergies` e migração (6.2, 6.5); `lib/allergens.ts`, `lib/medicationRisk.ts` (regra única `assessMedication`), `getAllergySelection`/`saveAllergySelection`, `useUserAllergies`, `AllergyPicker`, `AllergySummary`; `getMedicationsByRisk`, `getSafeAlternatives`, `classifyLabelText`/`analyzeLabel` passam a usar as alergias do perfil (7.1, 7.2.1, 7.5, 7.5.2). |
 | 1.10.0 | 12/11/2026 | Página de mensagens do administrador: colunas de status e políticas em `suggestions`/`feedback`, função `admin_list_messages`, migração e script manual (6.2, 6.4, 6.5); `services/adminMessages.ts`, `roleLoading` (7.5.3); `AdminMessagesPage` e item no menu (9). |
 | 1.11.0 | 12/11/2026 | Bulas no Storage: colunas `bula_*`, `bula_versoes`, bucket e funções (6.3, 6.4, 6.5); `services/bulas.ts`, script `bulas:sync` (4.3, 7.5.4); `BulaViewer` (9); `bula_reanalisar` → Atenção. |
+| 1.12.0 | 12/11/2026 | Envio de bulas em lote: `pdfText.ts` (pdf.js), `getBulaCatalog`, `lib/bulaMatch.ts` e `AdminBulasPage`; menu "Bulas em lote" para administradores (7.5.4 e 9). Funciona também fora de https/localhost (`sha256Js`); erros aparecem na tela. |

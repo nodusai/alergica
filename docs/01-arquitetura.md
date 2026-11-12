@@ -2,7 +2,7 @@
 titulo: Arquitetura do Sistema
 subtitulo: Visão completa da arquitetura de software do AlerGica — componentes, dados, integrações, segurança, implantação e evolução.
 categoria: Documento de Arquitetura
-versao: 1.8.0
+versao: 1.9.0
 atualizado: 12 de novembro de 2026
 publico: Arquitetos, CTOs e due diligence técnica
 classificacao: Confidencial
@@ -175,6 +175,7 @@ flowchart TB
 | `/privacidade` | `PrivacyPolicyPage` | Público | Política de Privacidade |
 | `/termos` | `TermsPage` | Público | Termos de Uso |
 | `/redefinir-senha` | `ResetPasswordPage` | Link do e-mail | Criação de nova senha após "Esqueci minha senha" |
+| `/admin/bulas` | `AdminBulasPage` | Só `admin` | Envio de várias bulas em PDF com identificação automática do remédio |
 | `/admin/mensagens` | `AdminMessagesPage` | Só `admin` | Caixa de Suporte, Sugestões e Feedback; quem não é administrador volta para `/dashboard` (o banco também bloqueia) |
 | `*` | `NotFound` | Público | Página 404 |
 
@@ -421,6 +422,8 @@ flowchart LR
   F --> G["Classificação normal"]
 ```
 
+**Envio em lote com identificação automática** (`/admin/bulas`): o administrador arrasta vários PDFs; o navegador lê o texto de cada bula (pdf.js) e `lib/bulaMatch.ts` pontua os remédios do catálogo por nome na capa (45), laboratório (30), princípios ativos (20) e nome do arquivo (5). Nome que é o próprio princípio ativo (genérico) vale metade, salvo se a bula se declara "Medicamento genérico". Só confiança **alta** (≥ 75 e 15 pontos à frente do próximo produto) vem marcada, incluindo as outras apresentações do mesmo produto (mesmo nome e laboratório); o resto o administrador confirma. Arquivo idêntico a um já guardado é reconhecido pelo hash. Cada PDF confirmado segue o fluxo acima (`admin_set_bula`).
+
 **Por que não é automático com a Anvisa:** a Anvisa não oferece API pública para baixar bulas, e a consulta do Bulário bloqueia acesso automatizado (testado em 12/11/2026). A estrutura acima aceita qualquer fonte autorizada: hoje, envio pelo administrador ou pelo script em lote; no futuro, uma fonte autorizada (API oficial com credenciais Gov.br ou serviço contratado) pode alimentar o mesmo fluxo por uma tarefa agendada, sem mudar o app. **Regra de segurança:** bula diferente da analisada nunca aparece como "Seguro" até a análise ser conferida.
 
 ### 9.3 Alternativas seguras
@@ -602,3 +605,4 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | 1.6.0 | 12/11/2026 | Rota `/admin/mensagens` (caixa de Suporte, Sugestões e Feedback); `suggestions`/`feedback` com status e leitura por `admin`; função `admin_list_messages` (seções 5.2 e 10.2). |
 | 1.7.0 | 12/11/2026 | Item 9 da dívida técnica: links de bula da Anvisa expiram; paliativo com busca no Bulário. |
 | 1.8.0 | 12/11/2026 | Nova seção 9.2.2: bulas guardadas no Supabase Storage com versão (SHA-256), histórico, visualizador no app, atualização pelo administrador ou script e "Atenção" até a nova análise; item 9 da dívida técnica atualizado. |
+| 1.9.0 | 12/11/2026 | Rota `/admin/bulas`: envio de bulas em lote com identificação automática do remédio pelo texto do PDF (seções 5.2 e 9.2.2). |

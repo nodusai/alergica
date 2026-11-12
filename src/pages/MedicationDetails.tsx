@@ -787,6 +787,12 @@ const MedicationDetails = () => {
                               Análise conferida — liberar classificação
                             </button>
                           )}
+                          <Link
+                            to="/admin/bulas"
+                            className={`block text-center text-xs font-bold text-foreground underline underline-offset-2 hover:text-primary ${focusRing}`}
+                          >
+                            Enviar várias bulas de uma vez
+                          </Link>
                           <p className="text-[11px] text-muted-foreground leading-relaxed">
                             Baixe o PDF atual no Bulário da Anvisa e envie aqui. Bula diferente da guardada coloca o remédio em
                             Atenção até a composição e os campos de risco serem revisados.

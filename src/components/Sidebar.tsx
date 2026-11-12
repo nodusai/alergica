@@ -1,4 +1,4 @@
-import { Home, User, Settings, LogOut, Pill, Stethoscope, Inbox } from "lucide-react";
+import { Home, User, Settings, LogOut, Pill, Stethoscope, Inbox, FileUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listAdminMessages } from "@/services/adminMessages";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -40,7 +40,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
   });
   const newMessages = (adminMessages.data ?? []).filter((m) => m.status === "novo").length;
   const navItems = isAdmin
-    ? [...NAV_ITEMS.slice(0, 2), { icon: Inbox, label: "Mensagens", path: "/admin/mensagens" }, ...NAV_ITEMS.slice(2)]
+    ? [...NAV_ITEMS.slice(0, 2), { icon: Inbox, label: "Mensagens", path: "/admin/mensagens" }, { icon: FileUp, label: "Bulas em lote", path: "/admin/bulas" }, ...NAV_ITEMS.slice(2)]
     : NAV_ITEMS;
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
