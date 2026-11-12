@@ -338,6 +338,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_consents: {
+        Row: {
+          consent_type: string
+          created_at: string
+          granted: boolean
+          id: string
+          user_id: string
+          version: string
+        }
+        Insert: {
+          consent_type: string
+          created_at?: string
+          granted: boolean
+          id?: string
+          user_id: string
+          version: string
+        }
+        Update: {
+          consent_type?: string
+          created_at?: string
+          granted?: boolean
+          id?: string
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
       user_onboarding: {
         Row: {
           completed_at: string | null
@@ -385,6 +412,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_medication_access: {
+        Args: { med_id: string }
+        Returns: undefined
       }
     }
     Enums: {
