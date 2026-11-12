@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "docs:pdf": "node scripts/build-docs.mjs"
+    "docs:pdf": "node scripts/build-docs.mjs",
+    "bulas:sync": "node --env-file=.env scripts/sync-bulas.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -14,7 +14,6 @@ import {
   getMedicationsPage,
   getMedicationsByRisk,
   searchMedications,
-  medToRisk,
   MedRow,
   MEDS_PAGE_SIZE,
 } from "@/services/medications";
@@ -23,15 +22,12 @@ import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductScanner from "@/components/ProductScanner";
 import { displayName, firstName } from "@/lib/names";
+import { useUserAllergies } from "@/hooks/use-user-allergies";
+import { assessMedication, assessmentBadge } from "@/lib/medicationRisk";
 
 
 type RiskLevel = "safe" | "caution" | "risk";
 
-const RISK_TEXT: Record<string, string> = {
-  safe: "Seguro (Sem Leite)",
-  caution: "Atenção (Verificar)",
-  risk: "Risco (Contém Leite)",
-};
 
 const RISK_FILTER_LABELS: { value: RiskLevel | "all"; label: string }[] = [
   { value: "all", label: "Todos" },
@@ -94,6 +90,10 @@ const Dashboard = () => {
 
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  // Alergias do perfil: mesma regra de risco das listas e do detalhe do remédio
+  const { effective: allergies, personalized, loading: loadingAllergies } = useUserAllergies();
+  const allergyKey = allergies.groups.map((g) => g.id).concat(allergies.custom).join("|");
+  const assess = (m: MedRow) => assessMedication(m, allergies);
 
   useEffect(() => {
     if (!loading && !user) navigate("/");
@@ -163,11 +163,11 @@ const Dashboard = () => {
 
   // Filtros de risco: carrega a lista filtrada uma vez; trocar de página não busca de novo
   useEffect(() => {
-    if (activeModule !== "medicamentos" || riskFilter === "all") return;
+    if (activeModule !== "medicamentos" || riskFilter === "all" || loadingAllergies) return;
     let cancelled = false;
     setLoadingMedTab(true);
     setMedTabMeds([]);
-    getMedicationsByRisk(riskFilter)
+    getMedicationsByRisk(riskFilter, allergies, personalized)
       .then((list) => {
         if (cancelled) return;
         setMedTabMeds(list);
@@ -178,7 +178,9 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeModule, riskFilter]);
+    // allergyKey resume as alergias do perfil (o objeto muda a cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeModule, riskFilter, allergyKey, personalized, loadingAllergies]);
 
   const changeMedPage = (page: number) => {
     setMedPage(page);
@@ -203,7 +205,7 @@ const Dashboard = () => {
   const filteredSearchResults =
     riskFilter === "all"
       ? searchResults
-      : searchResults.filter((m) => medToRisk(m.tem_risco_aplv, m.nivel_alerta, m.avisos) === riskFilter);
+      : searchResults.filter((m) => assess(m).level === riskFilter);
 
   // Início mostra no máximo 12 resultados de busca; a lista completa fica no módulo Remédios
   const displayMeds = searchQuery.trim() ? filteredSearchResults.slice(0, 12) : popularMedications;
@@ -327,8 +329,8 @@ const Dashboard = () => {
                             <MedicationCard
                               name={med.nome_principal}
                               laboratory={med.nome_alternativo ?? ""}
-                              riskLevel={medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)}
-                              riskText={RISK_TEXT[medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)] ?? med.nivel_alerta ?? ""}
+                              riskLevel={loadingAllergies ? "caution" : assess(med).level}
+                              riskText={loadingAllergies ? "Verificando…" : assessmentBadge(assess(med), personalized)}
                             />
                           </Link>
                         ))}
@@ -396,8 +398,8 @@ const Dashboard = () => {
                             <MedicationCard
                               name={med.nome_principal}
                               laboratory={med.nome_alternativo ?? ""}
-                              riskLevel={medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)}
-                              riskText={RISK_TEXT[medToRisk(med.tem_risco_aplv, med.nivel_alerta, med.avisos)] ?? med.nivel_alerta ?? ""}
+                              riskLevel={loadingAllergies ? "caution" : assess(med).level}
+                              riskText={loadingAllergies ? "Verificando…" : assessmentBadge(assess(med), personalized)}
                             />
                           </Link>
                         ))}

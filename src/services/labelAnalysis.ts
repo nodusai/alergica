@@ -7,6 +7,8 @@
  *    quando não encontra, o resultado é "inconclusivo" — nunca "seguro".
  */
 
+import { MILK_GROUP, searchTermsFor, type AllergenHit, type UserAllergies } from "@/lib/allergens";
+
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string | undefined;
 
 /** Resposta esperada do n8n */
@@ -21,8 +23,10 @@ export type LocalVerdict = "contains" | "traces" | "inconclusive";
 
 export type LocalScanResult = {
   verdict: LocalVerdict;
-  /** Termos lácteos encontrados no texto */
+  /** Termos das alergias do usuário encontrados no texto */
   found: string[];
+  /** Os mesmos termos, agrupados por alergia (Ovo, Soja...) */
+  hits: AllergenHit[];
   /** Confiança média da leitura (0–100) */
   confidence: number;
   /** Leitura fraca demais para concluir qualquer coisa */
@@ -44,26 +48,10 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ");
 
 /** Termos que indicam leite ou derivados em rótulos brasileiros */
-export const MILK_TERMS = [
-  "leite",
-  "lactose",
-  "caseina",
-  "caseinato",
-  "lactoalbumina",
-  "lactoglobulina",
-  "soro de leite",
-  "whey",
-  "manteiga",
-  "creme de leite",
-  "queijo",
-  "requeijao",
-  "iogurte",
-  "lacteo",
-  "lactea",
-  "lacteos",
-  "gordura do leite",
-  "nata",
-];
+export const MILK_TERMS = MILK_GROUP.terms;
+
+/** Padrão do app quando o perfil não tem alergias: APLV */
+const MILK_ONLY: UserAllergies = { groups: [MILK_GROUP], custom: [], empty: true };
 
 /** Leitura abaixo desta confiança é tratada como foto ruim */
 export const MIN_CONFIDENCE = 70;
@@ -104,38 +92,49 @@ const hasTerm = (text: string, term: string) => {
 };
 
 /**
- * Classifica o texto lido do rótulo.
- * - "contains": algum termo lácteo aparece fora de trechos de "pode conter" / "não contém".
- * - "traces": termo lácteo só aparece em "pode conter ...".
+ * Classifica o texto lido do rótulo para as alergias do usuário (padrão: leite/APLV).
+ * - "contains": algum termo aparece fora de trechos de "pode conter" / "não contém".
+ * - "traces": o termo só aparece em "pode conter ...".
  * - "inconclusive": nenhum termo encontrado (não significa que é seguro).
  */
-export const classifyLabelText = (raw: string): Pick<LocalScanResult, "verdict" | "found"> => {
+export const classifyLabelText = (
+  raw: string,
+  allergies: UserAllergies = MILK_ONLY,
+): Pick<LocalScanResult, "verdict" | "found" | "hits"> => {
   const t = norm(raw);
   // "pode conter" com pequenas falhas de leitura ("pode conler", "podem conter")
   const tracesRe = /podem? co[nm]\w{1,4}r?([^.]*)/g;
   const tracesParts = [...t.matchAll(tracesRe)].map((m) => m[1]);
-  const traceTerms = MILK_TERMS.filter((w) => tracesParts.some((p) => hasTerm(p, w)));
 
   const body = t
     .replace(tracesRe, " ")
     .replace(/nao contem[^.]*/g, " ")
     // "zero lactose" / "sem lactose" descrevem o produto, não são ingredientes
     .replace(/(zero|sem|0 ?%|baixo teor de|reduzido em) lactose/g, " ");
-  const found = MILK_TERMS.filter((w) => hasTerm(body, w));
 
-  if (found.length) return { verdict: "contains", found };
-  if (traceTerms.length) return { verdict: "traces", found: traceTerms };
-  return { verdict: "inconclusive", found: [] };
+  const groups = searchTermsFor(allergies).map((g) => ({ ...g, terms: g.terms.map(norm) }));
+  const collect = (inText: (term: string) => boolean): AllergenHit[] =>
+    groups
+      .map(({ id, label, kind, terms }) => ({ id, label, kind, found: terms.filter(inText) }))
+      .filter((h) => h.found.length > 0);
+
+  const contains = collect((w) => hasTerm(body, w));
+  if (contains.length) return { verdict: "contains", hits: contains, found: contains.flatMap((h) => h.found) };
+  const traces = collect((w) => tracesParts.some((p) => hasTerm(p, w)));
+  if (traces.length) return { verdict: "traces", hits: traces, found: traces.flatMap((h) => h.found) };
+  return { verdict: "inconclusive", hits: [], found: [] };
 };
 
 // ─── Análises ────────────────────────────────────────────────────────────────
 
 export const isAiConfigured = () => !!N8N_WEBHOOK_URL;
 
-const analyzeWithAi = async (image: Blob): Promise<AiScanResult> => {
+const analyzeWithAi = async (image: Blob, allergies: UserAllergies): Promise<AiScanResult> => {
   if (!N8N_WEBHOOK_URL) throw new Error("Webhook de análise não configurado");
   const formData = new FormData();
   formData.append("image", image, "produto.jpg");
+  // Alergias a verificar (grupos reconhecidos + termos próprios do perfil)
+  formData.append("allergies", JSON.stringify(searchTermsFor(allergies).map((g) => g.label)));
   const response = await fetch(N8N_WEBHOOK_URL, { method: "POST", body: formData, signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error(`n8n respondeu ${response.status}`);
   const data = await response.json();
@@ -231,7 +230,11 @@ const prepareForOcr = async (image: Blob) => {
   return { canvas: angle ? rotated(gray, angle) : gray, angle };
 };
 
-const analyzeLocally = async (image: Blob, onProgress?: (p: number) => void): Promise<LocalScanResult> => {
+const analyzeLocally = async (
+  image: Blob,
+  allergies: UserAllergies,
+  onProgress?: (p: number) => void,
+): Promise<LocalScanResult> => {
   // Carregado só quando necessário (biblioteca e dados de idioma pesam alguns MB)
   const { createWorker, PSM } = await import("tesseract.js");
   let pass = 0;
@@ -250,7 +253,7 @@ const analyzeLocally = async (image: Blob, onProgress?: (p: number) => void): Pr
       // Confiança alta com pouquíssimo texto é falsa (nada foi lido de verdade)
       const letters = data.text.replace(/[^\p{L}]/gu, "").length;
       const lowQuality = confidence < MIN_CONFIDENCE || letters < 40;
-      return { ...classifyLabelText(data.text), confidence, lowQuality, text: data.text };
+      return { ...classifyLabelText(data.text, allergies), confidence, lowQuality, text: data.text };
     };
 
     // 1ª leitura: bloco de texto único (melhor para listas de ingredientes)
@@ -269,13 +272,17 @@ const analyzeLocally = async (image: Blob, onProgress?: (p: number) => void): Pr
 };
 
 /** n8n primeiro; se não estiver configurado ou falhar, leitura local. Lança erro só se as duas falharem. */
-export const analyzeLabel = async (image: Blob, onProgress?: (p: number) => void): Promise<ScanOutcome> => {
+export const analyzeLabel = async (
+  image: Blob,
+  allergies: UserAllergies = MILK_ONLY,
+  onProgress?: (p: number) => void,
+): Promise<ScanOutcome> => {
   if (isAiConfigured()) {
     try {
-      return { source: "ai", result: await analyzeWithAi(image) };
+      return { source: "ai", result: await analyzeWithAi(image, allergies) };
     } catch (err) {
       console.warn("Análise por IA indisponível, usando leitura local:", err);
     }
   }
-  return { source: "local", result: await analyzeLocally(image, onProgress) };
+  return { source: "local", result: await analyzeLocally(image, allergies, onProgress) };
 };

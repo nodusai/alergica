@@ -3,6 +3,8 @@ import { AlertTriangle, Info, ListChecks, Lock, Milk, ScanLine, Sparkles, Sun, U
 
 import { analyzeLabel, type ScanOutcome } from "@/services/labelAnalysis";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useUserAllergies } from "@/hooks/use-user-allergies";
+import { effectiveAllergies, foodOnly, joinLabels, searchTermsFor } from "@/lib/allergens";
 
 // ─── ICONS ───────────────────────────────────────────────────────────────────
 const CameraIcon = () => (
@@ -63,6 +65,14 @@ export default function ProductScanner() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
+  // Alergias do perfil (sem nenhuma cadastrada: leite/APLV)
+  const { effective } = useUserAllergies();
+  // Rótulo de alimento: só alergias alimentares e termos próprios (remédios não entram)
+  const food = foodOnly(effective);
+  // Perfil só com alergias a remédios: o rótulo continua sendo verificado para leite (APLV)
+  const allergies = food.groups.length || food.custom.length ? food : effectiveAllergies(null);
+  const allergyLabels = searchTermsFor(allergies).map((g) => g.label);
+  const allergyList = joinLabels(allergyLabels.map((l) => l.toLowerCase().replace(" (aplv)", "")));
   const [progress, setProgress] = useState<number | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -153,14 +163,14 @@ export default function ProductScanner() {
     setProgress(null);
     try {
       const blob = await (await fetch(capturedImage)).blob();
-      setOutcome(await analyzeLabel(blob, setProgress));
+      setOutcome(await analyzeLabel(blob, allergies, setProgress));
       setStage("result");
     } catch (err) {
       console.error("Erro ao analisar produto:", err);
       setOutcome(null);
       setStage("error");
     }
-  }, [capturedImage]);
+  }, [capturedImage, allergies]);
 
   /** Foto escolhida da galeria (útil no computador, sem câmera traseira) */
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,15 +236,14 @@ export default function ProductScanner() {
             </div>
             <h3 className="mt-5 text-xl md:text-2xl font-extrabold tracking-[-0.02em] text-foreground">Fotografe o rótulo</h3>
             <p className="mt-2 text-[15px] text-muted-foreground leading-relaxed">
-              Nossa IA lê a lista de ingredientes e os avisos de alergênicos e mostra se o produto tem proteína do leite
-              de vaca ou outros alérgenos do seu perfil.
+              Nossa IA lê a lista de ingredientes e os avisos de alergênicos e mostra se o produto tem algum alérgeno
+              do seu perfil.
             </p>
 
             <ul className="mt-5 flex flex-wrap gap-2" aria-label="O que é verificado">
               {[
-                { icon: Milk, label: "Leite e derivados" },
+                ...allergyLabels.map((label) => ({ icon: label.startsWith("Leite") ? Milk : ListChecks, label })),
                 { icon: AlertTriangle, label: "Avisos de traços" },
-                { icon: ListChecks, label: "Outros alérgenos" },
               ].map(({ icon: Icon, label }) => (
                 <li key={label} className="inline-flex items-center gap-1.5 rounded-full bg-card/80 border border-border/70 px-3 py-1.5 text-[13px] font-semibold text-foreground/80">
                   <Icon className="w-3.5 h-3.5 text-[hsl(152_55%_32%)] dark:text-primary" /> {label}
@@ -408,7 +417,7 @@ export default function ProductScanner() {
             </p>
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
               {progress === null
-                ? "Procurando leite, derivados e avisos de traços na foto."
+                ? `Procurando ${allergyList} e avisos de traços na foto.`
                 : "Leitura feita no seu aparelho — a foto não é enviada."}
             </p>
           </div>
@@ -460,16 +469,20 @@ export default function ProductScanner() {
             : { tone: "risk", title: "Alérgenos detectados", text: r.details, terms: r.allergens, product: r.product };
         } else {
           const r = outcome.result;
+          const what = joinLabels(r.hits.map((h) => h.label.toLowerCase().replace(" (aplv)", "")));
+          const onlyMilk = r.hits.length > 0 && r.hits.every((h) => h.id === "leite");
           if (r.verdict === "contains")
-            view = { tone: "risk", title: "Contém leite ou derivados", terms: r.found, text: "Encontramos ingredientes de origem láctea no rótulo. Evite oferecer este produto." };
+            view = onlyMilk
+              ? { tone: "risk", title: "Contém leite ou derivados", terms: r.found, text: "Encontramos ingredientes de origem láctea no rótulo. Evite oferecer este produto." }
+              : { tone: "risk", title: `Contém ${what}`, terms: r.found, text: "Encontramos no rótulo ingredientes ligados às alergias do seu perfil. Evite este produto." };
           else if (r.verdict === "traces" && !r.lowQuality)
-            view = { tone: "caution", title: "Pode conter traços de leite", terms: r.found, text: "O rótulo avisa que o produto pode conter leite. Para quem tem APLV, o mais seguro é evitar." };
+            view = { tone: "caution", title: `Pode conter traços de ${what}`, terms: r.found, text: `O rótulo avisa que o produto pode conter ${what}. Para quem tem essa alergia, o mais seguro é evitar.` };
           else if (r.verdict === "traces")
-            view = { tone: "caution", title: "Possível aviso de leite", terms: r.found, text: "Encontramos um possível aviso de traços de leite, mas a foto está pouco nítida. Confira no rótulo." };
+            view = { tone: "caution", title: `Possível aviso de ${what}`, terms: r.found, text: `Encontramos um possível aviso de traços de ${what}, mas a foto está pouco nítida. Confira no rótulo.` };
           else if (r.lowQuality)
             view = { tone: "neutral", title: "Foto pouco nítida", text: "Não conseguimos ler o rótulo com segurança. Tire outra foto com boa luz, sem reflexos e com as letras em foco." };
           else
-            view = { tone: "neutral", title: "Não encontramos leite no texto lido", text: "Isso não garante que o produto é seguro: a leitura automática pode falhar. Confira os ingredientes e os avisos de alergênicos no rótulo." };
+            view = { tone: "neutral", title: `Não encontramos ${allergyList} no texto lido`, text: "Isso não garante que o produto é seguro: a leitura automática pode falhar. Confira os ingredientes e os avisos de alergênicos no rótulo." };
         }
         const TONE = {
           safe: { box: "bg-safe/10 border-safe/40", fg: "text-safe-foreground", icon: "text-safe", chip: "bg-safe/20" },

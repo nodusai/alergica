@@ -2,7 +2,7 @@
 titulo: Manual do Usuário
 subtitulo: Guia completo para usar o AlerGica no dia a dia — da criação da conta à consulta de medicamentos e produtos seguros para quem tem APLV.
 categoria: Manual do Usuário
-versao: 1.6.0
+versao: 1.10.0
 atualizado: 12 de novembro de 2026
 publico: Famílias, pessoas alérgicas e profissionais de saúde
 classificacao: Uso público
@@ -40,7 +40,7 @@ O AlerGica funciona direto no navegador — não é preciso instalar nada.
 
 1. Acesse o endereço do AlerGica. No celular, toque em **Começar** na tela de apresentação.
 2. Toque na aba **Criar conta**.
-3. Preencha as três partes do formulário:
+3. Preencha as quatro partes do formulário:
 
 | Parte | Campo | O que informar |
 |---|---|---|
@@ -50,12 +50,13 @@ O AlerGica funciona direto no navegador — não é preciso instalar nada.
 | 2. Sobre você | Quem é você? | Mãe, Pai, Sou a pessoa alérgica, Farmacêutico(a) ou Médico(a) |
 | | Data de nascimento | Obrigatória — a conta deve ser de um adulto (18 anos ou mais) |
 | | Cidade, UF, Sexo, Profissão | **Opcionais** |
-| 3. Privacidade | Termos e Política | Marque que leu e aceita os Termos de Uso e a Política de Privacidade (os links abrem em nova aba) |
+| 3. Alergias | Listas e Outros | Marque as alergias alimentares e a medicamentos. Não encontrou? Toque em **Outros** e escreva (ex.: *kiwi, tramadol*). Sem nada marcado, o app verifica leite (APLV). Pode mudar depois em Meu Perfil |
+| 4. Privacidade | Termos e Política | Marque que leu e aceita os Termos de Uso e a Política de Privacidade (os links abrem em nova aba) |
 | | Dados de saúde | Marque a autorização para o uso dos seus dados de saúde e dos das crianças que você cadastrar |
 
 4. Toque em **Criar conta**. Você entra automaticamente no aplicativo.
 
-> **Nota:** as duas autorizações da parte 3 são exigidas pela Lei Geral de Proteção de Dados (LGPD). Sem elas não é possível criar a conta, porque o AlerGica precisa das informações de alergia para funcionar. Você pode revogá-las a qualquer momento excluindo a conta (seção 16).
+> **Nota:** as duas autorizações da parte 4 são exigidas pela Lei Geral de Proteção de Dados (LGPD). Sem elas não é possível criar a conta, porque o AlerGica precisa das informações de alergia para funcionar. Você pode revogá-las a qualquer momento excluindo a conta (seção 16).
 
 Menores de 18 anos podem usar o AlerGica pela conta de um dos pais ou responsável.
 
@@ -140,22 +141,30 @@ No topo, abaixo do nome e do fabricante, aparece o resultado em destaque com a c
 
 - **Princípio ativo:** a substância que faz o efeito do remédio.
 - **Excipientes:** os demais ingredientes (conservantes, adoçantes, corantes…). Os **de origem láctea aparecem destacados em vermelho**, com o ícone de leite. O selo no topo informa quantos foram encontrados.
-- **Ingredientes com leite encontrados:** lista dos termos lácteos identificados na bula — ou a confirmação de que nenhum foi encontrado.
+- **Alergias do seu perfil:** o AlerGica procura as alergias que você marcou — alimentos na composição; remédios (ex.: penicilinas, dipirona) no princípio ativo. Se encontrar, o veredito fica **vermelho** ("Contém ovo"). Fica **amarelo** quando não dá para garantir: ingrediente sem origem informada (ex.: "lecitina" pode ser de soja ou de ovo), possível **reação cruzada** (ex.: cefalexina para quem tem alergia a penicilina) ou composição indisponível. Ingredientes suspeitos aparecem destacados em amarelo.
+- **Aviso de leite:** se o remédio tem leite mas leite não está no seu perfil, aparece um aviso no veredito — inclua APLV no perfil se for o caso.
+- **Ingredientes com leite encontrados:** (aparece quando o perfil tem APLV ou nenhuma alergia cadastrada) lista dos termos lácteos identificados na bula — ou a confirmação de que nenhum foi encontrado.
 - **Pontos críticos e Pontos de atenção:** explicações da análise automática, em linguagem simples. (Não são exibidos para perfis de farmacêutico e médico, que já consultam a composição técnica.)
 
 ### 9.3 Bula oficial
 
-O botão **Ver bula original (PDF)** abre o documento do fabricante. Abaixo dele aparece a data em que a bula foi analisada.
+- **Ver bula** abre, dentro do AlerGica, a bula que foi usada na análise. Dá para **Baixar** ou **Abrir em nova aba**. No celular Android, ela abre no leitor de PDF do aparelho.
+- Quando ainda não temos a cópia guardada, aparece **Ver bula original (PDF)**, com o link do fabricante. Esse link pode expirar.
+- **Buscar no Bulário da Anvisa** abre a busca oficial pelo nome do remédio, para conferir se saiu uma versão mais nova.
+- Abaixo aparecem as datas em que a bula foi guardada e analisada.
+- **"Bula atualizada — análise em revisão":** a bula mudou e a equipe está refazendo a análise. Até terminar, o remédio aparece como **Atenção**, mesmo que antes fosse Seguro.
 
 ### 9.4 Alternativas sem leite
 
-Quando o remédio é **Atenção** ou **Risco**, o AlerGica procura automaticamente **outros fabricantes com o mesmo princípio ativo e sem derivados do leite**. Toque em uma alternativa para ver os detalhes dela.
+Quando o remédio é **Atenção** ou **Risco**, o AlerGica procura automaticamente **outros fabricantes com o mesmo princípio ativo e sem derivados do leite** — e, se você tiver outras alergias no perfil, também sem esses ingredientes ("Alternativas para o seu perfil"). Toque em uma alternativa para ver os detalhes dela.
 
 > **Atenção:** dose, forma (comprimido, gotas, xarope) e indicação podem ser diferentes entre as alternativas. Só troque o medicamento com orientação do médico ou farmacêutico.
 
 Se nenhuma alternativa for encontrada, converse com o profissional de saúde sobre outras opções, como versões manipuladas.
 
 ## 10. Módulo Remédios
+
+As cores e os filtros seguem **as alergias do seu perfil** — a mesma análise da página de detalhes, então o selo da lista e o detalhe sempre concordam. Sem alergias cadastradas, a classificação é para leite (APLV).
 
 No menu inferior, toque em **Remédios** para navegar pelo catálogo.
 
@@ -179,13 +188,15 @@ No menu inferior, toque em **Produtos**.
 | Resultado | Cor | O que significa |
 |---|---|---|
 | **Produto seguro** | Verde | Só aparece na análise pela IA |
-| **Alérgenos detectados** / **Contém leite ou derivados** | Vermelho | Ingredientes de origem láctea encontrados — evite |
-| **Pode conter traços de leite** | Amarelo | O rótulo avisa "pode conter leite" — para APLV, o mais seguro é evitar |
-| **Não encontramos leite no texto lido** | Cinza | A leitura no aparelho não achou leite, mas **isso não garante que é seguro** — confira o rótulo |
+| **Alérgenos detectados** / **Contém leite ou derivados** / **Contém ovo** (ou outra alergia do perfil) | Vermelho | Ingredientes ligados às suas alergias encontrados — evite |
+| **Pode conter traços de…** | Amarelo | O rótulo avisa "pode conter" uma das suas alergias — o mais seguro é evitar |
+| **Não encontramos … no texto lido** | Cinza | A leitura no aparelho não achou leite, mas **isso não garante que é seguro** — confira o rótulo |
 | **Foto pouco nítida** | Cinza | A leitura ficou ruim; tire outra foto |
 
 A foto enviada aparece ao lado do resultado (abaixo, no celular). Toque nela, ou em **Ampliar**, para ver em tamanho grande e conferir os ingredientes. Abaixo do resultado aparece se a análise foi feita pela IA ou no aparelho (com a qualidade da leitura). A leitura no aparelho nunca mostra "seguro": ela só confirma quando encontra leite.
 4. Toque em **Novo scan** para verificar outro produto ou em **Concluir**.
+
+O scanner procura as **alergias cadastradas no seu perfil** (aparecem como etiquetas abaixo do texto "Fotografe o rótulo"). Sem alergias cadastradas, ele procura leite (APLV).
 
 Ao lado do botão, a tela mostra o passo a passo e dicas para uma boa leitura (boa iluminação, sem reflexos, letras nítidas).
 
@@ -224,6 +235,8 @@ Abra o menu e toque em **Meu Perfil**.
 
 O e-mail e o tipo de perfil não podem ser alterados por aqui.
 
+**Alergias:** marque nas listas **Alergias alimentares** (leite/APLV, ovo, soja, trigo/glúten, amendoim, castanhas e nozes, peixe, crustáceos, gergelim, milho) e **Alergias a medicamentos** (penicilinas, cefalosporinas, sulfas, anti-inflamatórios, AAS, dipirona, paracetamol, macrolídeos, quinolonas, anticonvulsivantes). Não encontrou? Toque em **Outros** e escreva, separando por vírgula. O AlerGica mostra na hora como entendeu: "amoxicilina" marca **Penicilinas**, "tartrazina" vira **Corantes**; o que não for reconhecido aparece com "· como escrito" e é procurado exatamente assim. No quadro **Saúde**, as alergias aparecem separadas em Alimentos, Medicamentos e Outros. Elas são usadas em toda a análise de remédios e rótulos; sem alergias cadastradas, o app verifica leite (APLV).
+
 ### 14.2 Meus bebês (perfis Mãe e Pai)
 
 Na seção de bebês você pode:
@@ -247,6 +260,20 @@ Toque na **mascote** no canto inferior direito de qualquer tela:
 | **Feedback** | Contar como foi sua experiência |
 
 Escreva a mensagem e envie. Você verá a confirmação "Obrigado por nos ajudar a melhorar! 💚".
+
+### 15.1 Para a equipe: página Mensagens (administradores)
+
+Contas com papel de **administrador** veem no menu lateral o item **Mensagens**, com o número de mensagens novas. Nele:
+
+- **Contadores** no topo — *Novas*, *Em andamento* e *Resolvidas*. Toque em um deles para ver só aquela situação (toque de novo para ver todas).
+- **Abas** *Todas*, *Suporte*, *Sugestões* e *Feedback*, e um campo de **busca** por texto, nome ou e-mail.
+- Em cada mensagem: tipo, nome e e-mail de quem enviou, quando foi enviada e o texto completo.
+- Mude a situação tocando em **Nova**, **Em andamento** ou **Resolvida**.
+- **Responder** abre seu programa de e-mail já com o endereço da pessoa; o botão ao lado **copia o e-mail**.
+
+**Atualizar uma bula:** na página do remédio, quadro **Bula oficial**, área **Administrador**: baixe o PDF atual no Bulário da Anvisa e toque em **Enviar nova versão da bula (PDF)**. Se o arquivo for igual ao guardado, nada muda. Se for diferente, o remédio fica em **Atenção** para todos até a composição ser revisada; depois toque em **Análise conferida — liberar classificação**.
+
+A lista atualiza sozinha a cada minuto (ou toque em **Atualizar**). A página mostra apenas nome e e-mail de quem escreveu — os dados de saúde dos usuários continuam privados.
 
 ## 16. Privacidade e seus dados (LGPD)
 
@@ -320,3 +347,7 @@ Sim. Basta entrar com o mesmo e-mail e senha.
 | 1.4.0 | 12/11/2026 | Novas telas de Meu Perfil (resumo e quadro de saúde), Configurações (tema na página) e Produtos (enviar foto da galeria, passo a passo e dicas). |
 | 1.5.0 | 12/11/2026 | Leitura do rótulo no próprio aparelho quando a IA está indisponível; novos tipos de resultado (traços, inconclusivo, foto pouco nítida). |
 | 1.6.0 | 12/11/2026 | Foto enviada exibida ao lado do resultado, com opção de ampliar. |
+| 1.7.0 | 12/11/2026 | Listas de alergias (alimentares, a medicamentos e "Outros") no cadastro e no perfil; cores das listas e do detalhe seguem as alergias do perfil, com "Atenção" para ingredientes de origem duvidosa, reação cruzada e composição indisponível. |
+| 1.8.0 | 12/11/2026 | Nova seção 15.1: página Mensagens para administradores (Suporte, Sugestões e Feedback). |
+| 1.9.0 | 12/11/2026 | Seção 9.3: botão "Buscar no Bulário da Anvisa" para quando o link do PDF da bula expira ou não existe. |
+| 1.10.0 | 12/11/2026 | Seção 9.3 reescrita (Ver bula no app, datas, "análise em revisão"); seção 15.1: administrador atualiza a bula. |

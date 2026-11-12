@@ -1,4 +1,6 @@
-import { Home, User, Settings, LogOut, Pill, Stethoscope } from "lucide-react";
+import { Home, User, Settings, LogOut, Pill, Stethoscope, Inbox } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { listAdminMessages } from "@/services/adminMessages";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -27,7 +29,19 @@ const professionalRole = (profile: ProfileSummary | null) => {
 
 const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: () => void }) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
+  // Administradores: item "Mensagens" com o número de mensagens novas
+  const adminMessages = useQuery({
+    queryKey: ["admin-messages"],
+    queryFn: listAdminMessages,
+    enabled: !!user && isAdmin,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const newMessages = (adminMessages.data ?? []).filter((m) => m.status === "novo").length;
+  const navItems = isAdmin
+    ? [...NAV_ITEMS.slice(0, 2), { icon: Inbox, label: "Mensagens", path: "/admin/mensagens" }, ...NAV_ITEMS.slice(2)]
+    : NAV_ITEMS;
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -120,7 +134,7 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
       <nav className="flex-1 px-4 pt-6" aria-label="Menu principal">
         <p className="px-3 mb-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground/80">Menu</p>
         <ul className="space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <li key={item.path}>
@@ -145,6 +159,14 @@ const Sidebar = ({ isDrawer = false, onClose }: { isDrawer?: boolean; onClose?: 
                     <item.icon className="w-[18px] h-[18px]" />
                   </span>
                   {item.label}
+                  {item.path === "/admin/mensagens" && newMessages > 0 && (
+                    <span
+                      className="ml-auto min-w-[22px] h-[22px] px-1.5 rounded-full bg-risk text-white text-[11px] font-extrabold tabular-nums flex items-center justify-center"
+                      aria-label={`${newMessages} mensagens novas`}
+                    >
+                      {newMessages > 99 ? "99+" : newMessages}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             );

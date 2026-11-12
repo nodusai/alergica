@@ -22,6 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { requestPasswordReset } from "@/services/auth";
 import { buildSignupConsents, logConsents } from "@/services/privacy";
+import { saveAllergySelection } from "@/services/profile";
+import AllergyPicker from "@/components/AllergyPicker";
+import { EMPTY_SELECTION, type AllergySelection } from "@/lib/allergens";
 import mascotImage from "@/assets/mascot.png";
 
 // ─── Opções ──────────────────────────────────────────────────────────────────
@@ -279,6 +282,7 @@ const AuthPage = () => {
   const [city, setCity] = useState("");
   const [uf, setUf] = useState("");
   const [profession, setProfession] = useState("");
+  const [allergySel, setAllergySel] = useState<AllergySelection>(EMPTY_SELECTION);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptHealth, setAcceptHealth] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -384,21 +388,35 @@ const AuthPage = () => {
     const { error: loginError } = await signIn(email.trim(), password);
     const { data: userData } = await supabase.auth.getUser();
     if (userData?.user) {
-      await Promise.all([
-        supabase.from("profiles").upsert(
-          {
-            user_id: userData.user.id,
-            profile_type: profileType,
+      const uid = userData.user.id;
+      // 1º o essencial (colunas que sempre existiram); 2º os dados complementares.
+      // Separado para que uma falha nos complementares não apague o tipo de perfil.
+      const { error: baseError } = await supabase
+        .from("profiles")
+        .upsert({ user_id: uid, full_name: fullName.trim(), profile_type: profileType } as never, { onConflict: "user_id" });
+      if (baseError) console.error("Cadastro: erro ao salvar perfil:", baseError.code, baseError.message);
+
+      const [{ error: extraError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .update({
             birth_date: birthDate || null,
             gender: gender || null,
             city: city.trim() || null,
             state: uf || null,
             profession: profession.trim() || null,
-          } as never,
-          { onConflict: "user_id" },
-        ),
-        logConsents(userData.user.id, consents),
+          } as never)
+          .eq("user_id", uid),
+        logConsents(uid, consents),
       ]);
+      if (extraError) console.error("Cadastro: erro ao salvar dados complementares:", extraError.code, extraError.message);
+
+      // Alergias (gravadas só depois do consentimento de dados de saúde, exigido acima)
+      const { error: allergyError } = await saveAllergySelection(uid, allergySel);
+      if (allergyError) {
+        console.error("Cadastro: erro ao salvar alergias:", allergyError.code, allergyError.message);
+        toast({ variant: "destructive", title: "Alergias não salvas", description: "Confira e salve suas alergias em Meu Perfil." });
+      }
     }
     setLoading(false);
 
@@ -757,7 +775,15 @@ const AuthPage = () => {
                 </Field>
               </div>
 
-              <SectionTitle step="3">Privacidade</SectionTitle>
+              <SectionTitle step="3">Alergias</SectionTitle>
+              <p className="text-[13px] text-muted-foreground -mt-2 leading-relaxed">
+                Marque as alergias de quem vai usar os remédios e alimentos. Não encontrou? Toque em{" "}
+                <strong className="text-foreground">Outros</strong> e escreva. Sem nada marcado, verificamos leite (APLV). Você
+                pode mudar depois em Meu Perfil.
+              </p>
+              <AllergyPicker value={allergySel} onChange={setAllergySel} />
+
+              <SectionTitle step="4">Privacidade</SectionTitle>
               <div className="space-y-3">
                 <ConsentCheckbox
                   id="aceite-termos"

@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  /** A checagem do papel de administrador ainda não terminou */
+  roleLoading: boolean;
   signUp: (
     email: string,
     password: string,
@@ -24,6 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Para qual usuário o papel já foi checado (evita um instante com isAdmin=false logo após o login)
+  const [roleCheckedFor, setRoleCheckedFor] = useState<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -49,12 +53,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkAdminRole = async () => {
       if (user) {
         const { data, error } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
-        if (!error) {
-          setIsAdmin(data);
-        }
+        setIsAdmin(!error && data === true);
       } else {
         setIsAdmin(false);
       }
+      setRoleCheckedFor(user?.id ?? null);
     };
     checkAdminRole();
   }, [user]);
@@ -95,7 +98,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, isAdmin, roleLoading: loading || (!!user && roleCheckedFor !== user.id), signUp, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

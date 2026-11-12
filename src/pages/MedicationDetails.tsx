@@ -3,6 +3,9 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  BookOpen,
+  Upload,
+  Loader2,
   CheckCircle,
   ExternalLink,
   FileText,
@@ -13,6 +16,7 @@ import {
   Pill,
   ShieldCheck,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
@@ -30,6 +34,12 @@ import {
 } from "@/services/medications";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserAllergies } from "@/hooks/use-user-allergies";
+import { findAllergens, joinLabels, shortLabel, type UserAllergies } from "@/lib/allergens";
+import { assessMedication } from "@/lib/medicationRisk";
+import BulaViewer from "@/components/BulaViewer";
+import { BulaSetupMissingError, bulaPublicUrl, markBulaAnalyzed, uploadBula } from "@/services/bulas";
+import { useToast } from "@/hooks/use-toast";
 
 const HEALTH_PROFESSIONAL_TYPES = ["farmaceutico", "medico"];
 
@@ -70,6 +80,42 @@ const isMilkDerived = (ingredient: string, extraTerms: string[]) => {
   const n = normalize(ingredient);
   return [...MILK_TERMS, ...extraTerms.map(normalize)].some((t) => t && n.includes(t));
 };
+
+/** Só aceita endereço web completo (http/https); caminhos locais ou texto solto não viram link */
+const validHttpUrl = (raw: string | null | undefined) => {
+  try {
+    const u = new URL((raw ?? "").trim());
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Palavras descritivas que não fazem parte do nome registrado na Anvisa */
+const GENERIC_WORDS = new Set(
+  (
+    "solucao solução fisiologica fisiológica injetavel injetável oral comprimido comprimidos revestido revestidos " +
+    "capsula cápsula capsulas cápsulas gotas xarope suspensao suspensão creme pomada gel spray po pó para de da do " +
+    "das dos com e em sodico sódico sodica sódica cloridrato infantil adulto pediatrico pediátrico uso"
+  ).split(" "),
+);
+
+/**
+ * Busca do remédio no Bulário Eletrônico da Anvisa.
+ * O Bulário procura pelo nome REGISTRADO e falha com descrições longas
+ * ("Solução fisiológica de Ringer com lactato de sódio" → nada). Por isso usa só a
+ * primeira palavra que identifica o produto ("Ringer", "Dipirona", "Novalgina").
+ */
+const anvisaQuery = (nome: string | null | undefined) => {
+  const base = (nome ?? "").replace(/\(.*$/, "").replace(/[®™]/g, " ");
+  const word = base
+    .split(/[\s,;/+-]+/)
+    .find((w) => w.length >= 3 && !/\d/.test(w) && !GENERIC_WORDS.has(w.toLowerCase()));
+  return word ?? base.trim();
+};
+
+const anvisaBularioUrl = (nome: string | null | undefined) =>
+  `https://consultas.anvisa.gov.br/#/bulario/q/?nomeProduto=${encodeURIComponent(anvisaQuery(nome))}`;
 
 const formatDate = (raw: string | null) => {
   if (!raw) return null;
@@ -129,7 +175,10 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 const MedicationDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { toast } = useToast();
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [bulaBusy, setBulaBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [medication, setMedication] = useState<Medication | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,23 +223,76 @@ const MedicationDetails = () => {
 
   const isHealthProfessional = profileType !== null && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
 
-  const riskKey = medToRisk(medication?.tem_risco_aplv, medication?.nivel_alerta, medication?.avisos);
+  // ── Alergias do perfil ──
+  // Mesma regra das listas (assessMedication): o selo da lista e esta página sempre concordam.
+  const { effective: allergies, personalized, loading: loadingAllergies } = useUserAllergies();
+  const assessment = assessMedication(medication ?? { tem_risco_aplv: null, nivel_alerta: null }, allergies);
+  const { milkChecked: milkApplies, hits, ambiguous, cross, unverified } = assessment;
+  const riskKey = assessment.level;
+  const otherAllergies: UserAllergies = { ...allergies, groups: allergies.groups.filter((g) => g.id !== "leite") };
+  const hasOtherAllergies = otherAllergies.groups.length + otherAllergies.custom.length > 0;
+  const otherLabels = [...otherAllergies.groups.map((g) => g.label), ...otherAllergies.custom];
+  const otherList = joinLabels(otherLabels.map(shortLabel));
+  const hitLabels = joinLabels(hits.map((h) => shortLabel(h.label)));
+  /** Remédio tem leite, mas leite não está no perfil: avisar mesmo assim */
+  const milkNote = !milkApplies && assessment.milkLevel !== "safe";
 
   // Sugere alternativas seguras quando o medicamento tem risco ou pede atenção
+  const allergyKey = allergies.groups.map((g) => g.id).concat(allergies.custom).join("|");
   useEffect(() => {
     setAlternatives([]);
-    if (!medication || riskKey === "safe") return;
+    if (!medication || riskKey === "safe" || loadingAllergies) return;
     let cancelled = false;
     setLoadingAlternatives(true);
-    getSafeAlternatives(medication)
+    getSafeAlternatives(medication, 6, allergies)
       .then((alts) => !cancelled && setAlternatives(alts))
       .catch((err) => console.error("Erro ao buscar alternativas:", err))
       .finally(() => !cancelled && setLoadingAlternatives(false));
     return () => {
       cancelled = true;
     };
-  }, [medication, riskKey]);
-  const risk = RISK_CONFIG[riskKey];
+    // allergyKey resume as alergias do perfil (o objeto muda a cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medication, riskKey, allergyKey, loadingAllergies]);
+
+  // Textos do resultado conforme o motivo
+  const allLabels = joinLabels([...(milkApplies ? ["leite"] : []), ...otherLabels.map(shortLabel)]);
+  const risk = (() => {
+    const base = RISK_CONFIG[riskKey];
+    if (!personalized && !(riskKey === "caution" && assessment.bulaPending)) return base;
+    if (riskKey === "risk") {
+      const what = joinLabels([...(milkApplies && assessment.milkLevel === "risk" ? ["leite"] : []), ...hits.map((h) => shortLabel(h.label))]);
+      return {
+        ...base,
+        eyebrow: "Não recomendado para o seu perfil",
+        label: `Contém ${what}`,
+        description: hits.length
+          ? `Encontramos ${hitLabels} na composição ou no princípio ativo, e isso está nas alergias do seu perfil.`
+          : base.description,
+      };
+    }
+    if (riskKey === "caution") {
+      const reasons = [
+        ...(milkApplies && assessment.milkLevel === "caution" ? ["pode haver traços de leite"] : []),
+        ...ambiguous.map((h) => `${h.found.join(", ")} sem origem informada (pode conter ${shortLabel(h.label)})`),
+        ...cross.map((c) => `${shortLabel(c.label)} pode causar reação cruzada em quem tem alergia a ${shortLabel(c.because)}`),
+        ...(unverified.length ? [`a composição não está na nossa base para verificar ${joinLabels(unverified.map(shortLabel))}`] : []),
+        ...(assessment.bulaPending ? ["a bula foi atualizada e a análise ainda está sendo refeita"] : []),
+      ];
+      return {
+        ...base,
+        eyebrow: "Atenção para o seu perfil",
+        label: "Confirme com o médico ou farmacêutico",
+        description: `Não dá para garantir que é seguro: ${reasons.join("; ")}.`,
+      };
+    }
+    return {
+      ...base,
+      eyebrow: "Seguro para o seu perfil",
+      label: `Sem ${allLabels} na composição`,
+      description: "Não encontramos ingredientes ligados às alergias do seu perfil, nem ingredientes de origem duvidosa.",
+    };
+  })();
   const RiskIcon = risk.icon;
 
   const avisos = parseTextField(medication?.avisos ?? null);
@@ -203,8 +305,76 @@ const MedicationDetails = () => {
   const { ativos, excipientes } = medication?.composicao
     ? parseComposicao(medication.composicao)
     : { ativos: [], excipientes: [] };
-  const excipientesLacteos = excipientes.filter((e) => isMilkDerived(e, termosReais));
+  /** Excipiente com alérgeno do perfil (leite pelos termos lácteos; demais pela composição) */
+  const isFlagged = (item: string) =>
+    (milkApplies && isMilkDerived(item, termosReais)) || findAllergens(item, otherAllergies).length > 0;
+  /** Excipiente de origem não informada que pode conter uma alergia do perfil */
+  const ambiguousTerms = ambiguous.flatMap((h) => h.found);
+  const isDoubtful = (item: string) =>
+    !isFlagged(item) && ambiguousTerms.some((t) => new RegExp(`(^|[^a-z])${t}([^a-z]|$)`).test(normalize(item)));
+  const excipientesLacteos = excipientes.filter(isFlagged);
+  const flagWord = !hasOtherAllergies
+    ? "de origem láctea"
+    : milkApplies || otherLabels.length > 1
+      ? "com alérgeno do perfil"
+      : `com ${otherLabels[0].toLowerCase()}`;
   const dataAnalise = formatDate(medication?.data_extracao ?? null);
+  const bulaUrl = validHttpUrl(medication?.arquivo_url);
+  /** Cópia guardada no AlerGica (preferida: não expira e é a versão registrada) */
+  const storedBulaUrl = medication?.bula_path ? bulaPublicUrl(medication.bula_path) : null;
+  const bulaAtualizada = formatDate(medication?.bula_atualizada_em ?? null);
+
+  const reloadMedication = async () => {
+    if (!id) return;
+    setMedication(await getMedication(id));
+  };
+
+  /** Administrador: envia nova versão da bula */
+  const handleBulaFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !medication) return;
+    setBulaBusy(true);
+    try {
+      const r = await uploadBula(medication.id, file);
+      await reloadMedication();
+      toast(
+        r === "igual"
+          ? { title: "Nada mudou", description: "Este PDF é idêntico à bula já guardada." }
+          : {
+              title: r === "primeira" ? "Bula guardada" : "Nova versão da bula guardada",
+              description: "O remédio fica em Atenção até a análise ser conferida.",
+            },
+      );
+    } catch (err) {
+      toast({
+        title: "Não foi possível enviar a bula",
+        description:
+          err instanceof BulaSetupMissingError
+            ? "Falta rodar o script supabase/manual/2026-11-12_bulas_storage.sql no banco."
+            : err instanceof Error
+              ? err.message
+              : "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setBulaBusy(false);
+    }
+  };
+
+  const handleBulaAnalyzed = async () => {
+    if (!medication) return;
+    setBulaBusy(true);
+    try {
+      await markBulaAnalyzed(medication.id);
+      await reloadMedication();
+      toast({ title: "Análise conferida", description: "A classificação normal do remédio foi liberada." });
+    } catch {
+      toast({ title: "Não foi possível atualizar", description: "Tente novamente.", variant: "destructive" });
+    } finally {
+      setBulaBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -239,7 +409,7 @@ const MedicationDetails = () => {
               </button>
             </div>
 
-            {loading ? (
+            {loading || loadingAllergies ? (
               <div className="space-y-6">
                 <Skeleton className="h-40 rounded-3xl" />
                 <div className="grid lg:grid-cols-5 gap-6">
@@ -303,7 +473,16 @@ const MedicationDetails = () => {
                           {risk.label}
                         </h2>
                         <p className={`text-sm ${risk.title} opacity-90 mt-1 leading-relaxed`}>{risk.description}</p>
-                        {avisos.filter((a) => !/^status:/i.test(a)).length > 0 && (
+                        {milkNote && (
+                          <p className={`mt-3 text-sm ${risk.title} leading-relaxed flex gap-2`}>
+                            <Milk className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>
+                              Este remédio {assessment.milkLevel === "risk" ? "contém" : "pode conter"} derivados do leite. Leite não
+                              está nas alergias do seu perfil — se houver APLV, inclua no seu perfil.
+                            </span>
+                          </p>
+                        )}
+                        {milkApplies && avisos.filter((a) => !/^status:/i.test(a)).length > 0 && (
                           <ul className={`mt-3 space-y-1 text-sm ${risk.title}`}>
                             {avisos
                               .filter((a) => !/^status:/i.test(a))
@@ -336,8 +515,8 @@ const MedicationDetails = () => {
                         >
                           <Milk className="w-3.5 h-3.5" />
                           {excipientesLacteos.length > 0
-                            ? `${excipientesLacteos.length} de origem láctea`
-                            : "Nenhum de origem láctea"}
+                            ? `${excipientesLacteos.length} ${flagWord}`
+                            : `Nenhum ${flagWord}`}
                         </span>
                       )}
                     </div>
@@ -364,17 +543,21 @@ const MedicationDetails = () => {
                             <SectionLabel>Excipientes ({excipientes.length})</SectionLabel>
                             <ul className="flex flex-wrap gap-2">
                               {excipientes.map((item, i) => {
-                                const lacteo = isMilkDerived(item, termosReais);
+                                const lacteo = isFlagged(item);
+                                const duvida = isDoubtful(item);
                                 return (
                                   <li
                                     key={i}
                                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm leading-snug border ${
                                       lacteo
                                         ? "bg-risk/10 border-risk/40 text-risk-foreground font-semibold"
-                                        : "bg-secondary/70 border-transparent text-foreground/80"
+                                        : duvida
+                                          ? "bg-caution/10 border-caution/40 text-caution-foreground font-semibold"
+                                          : "bg-secondary/70 border-transparent text-foreground/80"
                                     }`}
                                   >
-                                    {lacteo && <Milk className="w-3.5 h-3.5" aria-label="Origem láctea" />}
+                                    {lacteo && <AlertTriangle className="w-3.5 h-3.5" aria-label="Alérgeno do seu perfil" />}
+                                    {duvida && <AlertCircle className="w-3.5 h-3.5" aria-label="Origem não informada" />}
                                     {item}
                                   </li>
                                 );
@@ -383,7 +566,7 @@ const MedicationDetails = () => {
                             {excipientesLacteos.length > 0 && (
                               <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5">
                                 <Milk className="w-3.5 h-3.5 text-risk" />
-                                Destacados: ingredientes de origem láctea.
+                                Destacados: ingredientes {flagWord}.
                               </p>
                             )}
                           </div>
@@ -395,7 +578,70 @@ const MedicationDetails = () => {
                       </p>
                     )}
 
+                    {/* Alergias do perfil (além de leite): composição e princípio ativo */}
+                    {hasOtherAllergies && (
+                      <div className="mt-6 pt-5 border-t border-border/60 space-y-3">
+                        <SectionLabel>Alergias do seu perfil</SectionLabel>
+                        {hits.length > 0 && (
+                          <ul className="space-y-2">
+                            {hits.map((h) => (
+                              <li key={h.label} className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-bold text-risk-foreground">{h.label}:</span>
+                                {h.found.map((t) => (
+                                  <span
+                                    key={t}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-risk/10 border border-risk/40 text-sm font-semibold text-risk-foreground"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    {t}
+                                  </span>
+                                ))}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {(ambiguous.length > 0 || cross.length > 0) && (
+                          <ul className="space-y-1.5 rounded-2xl bg-caution/10 border border-caution/30 p-4 text-sm text-caution-foreground leading-relaxed">
+                            {ambiguous.map((h) => (
+                              <li key={`a-${h.id}`} className="flex gap-2">
+                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>{h.found.join(", ")}</strong> sem origem informada na bula — pode conter{" "}
+                                  {shortLabel(h.label)}.
+                                </span>
+                              </li>
+                            ))}
+                            {cross.map((c) => (
+                              <li key={`c-${c.label}`} className="flex gap-2">
+                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>{c.found.join(", ")}</strong> ({shortLabel(c.label)}): possível reação cruzada com{" "}
+                                  {shortLabel(c.because)}.
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {unverified.length > 0 && (
+                          <p className="text-sm text-caution-foreground flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-caution shrink-0" />
+                            Sem composição na nossa base para verificar {joinLabels(unverified.map(shortLabel))}.
+                          </p>
+                        )}
+                        {hits.length === 0 && ambiguous.length === 0 && cross.length === 0 && unverified.length === 0 && (
+                          <p className="text-sm text-foreground/80 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-safe shrink-0" />
+                            Não encontramos {otherList} na composição.
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Verificação automática pelos nomes dos ingredientes. Confirme na bula ou com o farmacêutico.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Resultado da verificação de termos */}
+                    {milkApplies && (
                     <div className="mt-6 pt-5 border-t border-border/60">
                       <SectionLabel>Ingredientes com leite encontrados</SectionLabel>
                       {termosReais.length > 0 ? (
@@ -417,6 +663,7 @@ const MedicationDetails = () => {
                         </p>
                       )}
                     </div>
+                    )}
 
                     {/* Análise da IA — oculta para farmacêuticos e médicos */}
                     {!isHealthProfessional && (criticos.length > 0 || atencao.length > 0) && (
@@ -452,24 +699,111 @@ const MedicationDetails = () => {
                       <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                         Confira a composição completa no documento original do fabricante.
                       </p>
+                      {storedBulaUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewerOpen(true)}
+                          className={`w-full inline-flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-primary text-primary-foreground font-bold shadow-[0_1px_2px_hsl(var(--primary)/0.3),0_8px_20px_-8px_hsl(var(--primary)/0.7)] hover:brightness-105 active:scale-[0.98] transition-transform ${focusRing}`}
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          Ver bula
+                        </button>
+                      ) : (
+                        bulaUrl && (
+                          <a
+                            href={bulaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-full inline-flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-primary text-primary-foreground font-bold shadow-[0_1px_2px_hsl(var(--primary)/0.3),0_8px_20px_-8px_hsl(var(--primary)/0.7)] hover:brightness-105 active:scale-[0.98] transition-transform ${focusRing}`}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Ver bula original (PDF)
+                          </a>
+                        )
+                      )}
+                      {/* Busca no Bulário da Anvisa: confere se há versão mais nova */}
                       <a
-                        href={medication.arquivo_url ?? undefined}
+                        href={anvisaBularioUrl(medication.nome_principal)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-disabled={!medication.arquivo_url}
-                        onClick={(e) => !medication.arquivo_url && e.preventDefault()}
-                        className={`w-full inline-flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-primary text-primary-foreground font-bold shadow-[0_1px_2px_hsl(var(--primary)/0.3),0_8px_20px_-8px_hsl(var(--primary)/0.7)] hover:brightness-105 active:scale-[0.98] transition-transform ${focusRing} aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:shadow-none`}
+                        className={`mt-2.5 w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl border-2 font-bold active:scale-[0.98] transition-transform ${focusRing} ${
+                          storedBulaUrl || bulaUrl
+                            ? "border-border bg-card text-foreground hover:border-primary/60 hover:bg-secondary"
+                            : "border-primary bg-primary text-primary-foreground hover:brightness-105"
+                        }`}
                       >
-                        <ExternalLink className="w-4 h-4" />
-                        Ver bula original (PDF)
+                        <Search className="w-4 h-4" />
+                        Buscar no Bulário da Anvisa
                       </a>
-                      {dataAnalise && (
-                        <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5">
-                          <CalendarDays className="w-3.5 h-3.5" />
-                          Bula analisada em {dataAnalise}
+                      <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                        {storedBulaUrl
+                          ? "Bula guardada pelo AlerGica. Para ver se saiu uma versão mais nova, consulte o Bulário da Anvisa."
+                          : bulaUrl
+                            ? "O link do PDF pode expirar. Se não abrir, busque a bula atual no Bulário da Anvisa."
+                            : "O PDF desta bula não está na nossa base. Busque a versão atual no Bulário da Anvisa."}
+                      </p>
+                      {(bulaAtualizada || dataAnalise) && (
+                        <div className="mt-4 space-y-1">
+                          {bulaAtualizada && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <CalendarDays className="w-3.5 h-3.5" />
+                              Bula guardada em {bulaAtualizada}
+                            </p>
+                          )}
+                          {dataAnalise && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <CalendarDays className="w-3.5 h-3.5" />
+                              Bula analisada em {dataAnalise}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {assessment.bulaPending && (
+                        <p className="mt-3 rounded-xl bg-caution/10 border border-caution/30 px-3 py-2 text-xs font-semibold text-caution-foreground leading-relaxed">
+                          Bula atualizada — análise em revisão. Até lá, o remédio aparece como Atenção.
                         </p>
                       )}
+
+                      {/* Administrador: nova versão da bula */}
+                      {isAdmin && (
+                        <div className="mt-5 pt-4 border-t border-border/60 space-y-2.5">
+                          <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground">Administrador</p>
+                          <label
+                            className={`w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl border-2 border-dashed border-primary/50 text-sm font-bold text-foreground cursor-pointer hover:bg-primary/5 active:scale-[0.98] transition-transform focus-within:ring-2 focus-within:ring-primary ${
+                              bulaBusy ? "opacity-60 pointer-events-none" : ""
+                            }`}
+                          >
+                            {bulaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            {storedBulaUrl ? "Enviar nova versão da bula (PDF)" : "Guardar bula (PDF)"}
+                            <input type="file" accept="application/pdf" className="sr-only" onChange={handleBulaFile} disabled={bulaBusy} />
+                          </label>
+                          {assessment.bulaPending && (
+                            <button
+                              type="button"
+                              onClick={handleBulaAnalyzed}
+                              disabled={bulaBusy}
+                              className={`w-full h-10 rounded-xl border-2 border-border bg-card text-sm font-bold text-foreground hover:border-primary/60 hover:bg-secondary active:scale-[0.98] transition-transform disabled:opacity-50 ${focusRing}`}
+                            >
+                              Análise conferida — liberar classificação
+                            </button>
+                          )}
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Baixe o PDF atual no Bulário da Anvisa e envie aqui. Bula diferente da guardada coloca o remédio em
+                            Atenção até a composição e os campos de risco serem revisados.
+                          </p>
+                        </div>
+                      )}
                     </div>
+
+                    {storedBulaUrl && (
+                      <BulaViewer
+                        open={viewerOpen}
+                        onOpenChange={setViewerOpen}
+                        url={storedBulaUrl}
+                        title={medication.nome_principal}
+                        updatedAt={bulaAtualizada}
+                      />
+                    )}
 
                     <div className="rounded-3xl bg-caution/10 border border-caution/30 p-5 flex gap-3">
                       <Info className="w-5 h-5 text-caution-foreground shrink-0 mt-0.5" />
@@ -496,10 +830,12 @@ const MedicationDetails = () => {
                           id="alternativas-titulo"
                           className="text-lg md:text-xl font-extrabold text-foreground tracking-[-0.02em]"
                         >
-                          Alternativas sem leite
+                          {hasOtherAllergies ? "Alternativas para o seu perfil" : "Alternativas sem leite"}
                         </h2>
                         <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
-                          Outros fabricantes com o mesmo princípio ativo, sem derivados do leite na bula.
+                          {hasOtherAllergies
+                            ? `Outros fabricantes com o mesmo princípio ativo, sem ${allLabels} na composição.`
+                            : "Outros fabricantes com o mesmo princípio ativo, sem derivados do leite na bula."}
                         </p>
                       </div>
                     </div>
@@ -544,7 +880,7 @@ const MedicationDetails = () => {
                     ) : (
                       <p className="text-sm text-muted-foreground leading-relaxed rounded-2xl bg-secondary/60 p-4">
                         Não encontramos na nossa base outro medicamento seguro com o mesmo princípio ativo. Converse
-                        com o médico ou farmacêutico sobre opções sem leite, como versões manipuladas.
+                        com o médico ou farmacêutico sobre opções seguras para o seu perfil, como versões manipuladas.
                       </p>
                     )}
                   </section>

@@ -3,6 +3,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sparkles, Loader2, CheckCircle, Edit2, RotateCcw, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { USER_ALLERGIES_KEY } from "@/hooks/use-user-allergies";
 import mascotImage from "@/assets/mascot.png";
 
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
@@ -20,6 +22,7 @@ interface OnboardingModalProps {
 const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps) => {
   const isHealthProfessional = !!profileType && HEALTH_PROFESSIONAL_TYPES.includes(profileType);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("welcome");
   const [allergyInput, setAllergyInput] = useState("");
   const [aiResult, setAiResult] = useState("");
@@ -70,6 +73,7 @@ const OnboardingModal = ({ open, onComplete, profileType }: OnboardingModalProps
       await supabase
         .from("profiles")
         .upsert({ user_id: user.id, allergy_info: data }, { onConflict: "user_id" });
+      queryClient.invalidateQueries({ queryKey: [USER_ALLERGIES_KEY] });
     }
     setSaving(false);
     onComplete();

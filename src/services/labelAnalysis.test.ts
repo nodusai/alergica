@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { classifyLabelText } from "./labelAnalysis";
+import { parseAllergyInfo } from "@/lib/allergens";
 
 describe("classifyLabelText", () => {
   it("detecta leite nos ingredientes (Nescau, leitura real do teste)", () => {
@@ -57,5 +58,25 @@ describe("classifyLabelText", () => {
   it("reconhece outros derivados", () => {
     expect(classifyLabelText("Ingredientes: farinha, manteiga, ovos.").found).toContain("manteiga");
     expect(classifyLabelText("Contém caseinato de sódio.").found).toContain("caseinato");
+  });
+});
+
+describe("classifyLabelText com as alergias do perfil", () => {
+  it("procura ovo quando o perfil tem alergia a ovo, e não acusa leite", () => {
+    const ovo = parseAllergyInfo("Ovo, clara de ovo, albumina");
+    const r = classifyLabelText("Ingredientes: farinha de trigo, açúcar, ovo em pó, leite em pó.", ovo);
+    expect(r.verdict).toBe("contains");
+    expect(r.hits.map((h) => h.label)).toEqual(["Ovo"]);
+    expect(r.found).not.toContain("leite");
+  });
+
+  it("separa traços de amendoim dos ingredientes", () => {
+    const r = classifyLabelText("Ingredientes: cacau, açúcar. PODE CONTER AMENDOIM.", parseAllergyInfo("amendoim"));
+    expect(r.verdict).toBe("traces");
+    expect(r.hits[0].label).toBe("Amendoim");
+  });
+
+  it("procura termos próprios do perfil", () => {
+    expect(classifyLabelText("Ingredientes: polpa de kiwi, água.", parseAllergyInfo("kiwi")).verdict).toBe("contains");
   });
 });

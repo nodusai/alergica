@@ -14,6 +14,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { displayName, initials } from "@/lib/names";
+import AllergyPicker from "@/components/AllergyPicker";
+import AllergySummary from "@/components/AllergySummary";
+import { saveAllergySelection, selectionFromRow } from "@/services/profile";
+import { buildUserAllergies, EMPTY_SELECTION, type AllergySelection } from "@/lib/allergens";
+import { useQueryClient } from "@tanstack/react-query";
+import { USER_ALLERGIES_KEY } from "@/hooks/use-user-allergies";
 
 const PROFILE_TYPE_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
   alergica: { label: "Pessoa alérgica", icon: Heart },
@@ -57,7 +63,7 @@ const EMPTY: ProfileData = {
 };
 
 /** Campos que contam para "perfil completo" */
-const COMPLETENESS_FIELDS: (keyof ProfileData)[] = ["full_name", "birth_date", "phone", "city", "allergy_info"];
+const COMPLETENESS_FIELDS: (keyof ProfileData)[] = ["full_name", "birth_date", "phone", "city"];
 
 const formatDate = (raw: string) => {
   const [y, m, d] = raw.split("-");
@@ -109,11 +115,15 @@ const CardTitle = ({ icon: Icon, title, aside }: { icon: React.ElementType; titl
 // ─── Página ──────────────────────────────────────────────────────────────────
 const ProfilePage = () => {
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<ProfileData>(EMPTY);
   const [draft, setDraft] = useState<ProfileData>(EMPTY);
+  // Alergias: listas marcadas + "Outros" (salvas em food_allergies, drug_allergies e allergy_info)
+  const [allergies, setAllergies] = useState<AllergySelection>(EMPTY_SELECTION);
+  const [allergyDraft, setAllergyDraft] = useState<AllergySelection>(EMPTY_SELECTION);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -146,6 +156,9 @@ const ProfilePage = () => {
       };
       setProfile(filled);
       setDraft(filled);
+      const sel = selectionFromRow(d);
+      setAllergies(sel);
+      setAllergyDraft(sel);
       setLoadingProfile(false);
     };
     fetchProfile();
@@ -153,11 +166,13 @@ const ProfilePage = () => {
 
   const startEdit = () => {
     setDraft(profile);
+    setAllergyDraft(allergies);
     setEditing(true);
   };
 
   const cancelEdit = () => {
     setDraft(profile);
+    setAllergyDraft(allergies);
     setEditing(false);
   };
 
@@ -169,7 +184,6 @@ const ProfilePage = () => {
         user_id: user.id,
         full_name: draft.full_name.trim(),
         phone: draft.phone.trim(),
-        allergy_info: draft.allergy_info.trim(),
         observation: draft.observation.trim(),
         birth_date: draft.birth_date || null,
         gender: draft.gender || null,
@@ -182,10 +196,27 @@ const ProfilePage = () => {
     );
     setSaving(false);
     if (error) {
-      toast({ title: "Erro ao salvar", description: "Tente novamente.", variant: "destructive" });
+      console.error("Erro ao salvar perfil:", error.code, error.message);
+      toast({
+        title: "Não foi possível salvar",
+        description:
+          error.code === "42703" || error.code === "PGRST204"
+            ? "O banco de dados está desatualizado. Avise o suporte."
+            : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
       return;
     }
+    const { error: allergyError, fallback } = await saveAllergySelection(user.id, allergyDraft);
+    queryClient.invalidateQueries({ queryKey: [USER_ALLERGIES_KEY] });
+    if (allergyError) {
+      console.error("Erro ao salvar alergias:", allergyError.code, allergyError.message);
+      toast({ title: "Não foi possível salvar as alergias", description: "Tente novamente em instantes.", variant: "destructive" });
+      return;
+    }
+    if (fallback) console.warn("Banco sem food_allergies/drug_allergies: alergias salvas como texto em allergy_info.");
     setProfile(draft);
+    setAllergies(allergyDraft);
     setEditing(false);
     toast({ title: "Perfil atualizado!", description: "Suas informações foram salvas." });
   };
@@ -197,8 +228,9 @@ const ProfilePage = () => {
   const type = PROFILE_TYPE_LABELS[profile.profile_type];
   const TypeIcon = type?.icon;
   const isParent = profile.profile_type === "mae" || profile.profile_type === "pai";
-  const filledCount = COMPLETENESS_FIELDS.filter((k) => profile[k].trim()).length;
-  const completeness = Math.round((filledCount / COMPLETENESS_FIELDS.length) * 100);
+  const filledCount =
+    COMPLETENESS_FIELDS.filter((k) => profile[k].trim()).length + (buildUserAllergies(allergies).empty ? 0 : 1);
+  const completeness = Math.round((filledCount / (COMPLETENESS_FIELDS.length + 1)) * 100);
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
     : null;
@@ -328,9 +360,14 @@ const ProfilePage = () => {
                           <Lock className="w-4 h-4" /> Informações de saúde
                           <span className="font-medium text-muted-foreground">· dado sensível protegido pela LGPD</span>
                         </p>
-                        <Field id="allergy_info" label="Alergias">
-                          <input id="allergy_info" value={draft.allergy_info} onChange={set("allergy_info")} placeholder="Ex.: APLV, ovo, soja" className={inputCls} />
-                        </Field>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground mb-1">Alergias</p>
+                          <p className="text-[13px] text-muted-foreground mb-3">
+                            Marque as alergias. Não encontrou? Toque em <strong>Outros</strong> e escreva. Usamos estas
+                            alergias para analisar remédios e rótulos.
+                          </p>
+                          <AllergyPicker value={allergyDraft} onChange={setAllergyDraft} />
+                        </div>
                         <Field id="observation" label="Observações">
                           <textarea
                             id="observation"
@@ -382,7 +419,14 @@ const ProfilePage = () => {
                     <section className={`lg:col-span-2 ${ELEVATED} p-6 md:p-8 animate-fade-in`} style={{ animationDelay: "0.05s" }}>
                       <CardTitle icon={AlertTriangle} title="Saúde" />
                       <dl className="space-y-6">
-                        <Value icon={AlertTriangle} label="Alergias" value={profile.allergy_info} />
+                        <div>
+                          <dt className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Alergias
+                          </dt>
+                          <dd>
+                            <AllergySummary value={allergies} />
+                          </dd>
+                        </div>
                         <Value icon={FileText} label="Observações" value={profile.observation} />
                       </dl>
                       <p className="mt-6 pt-5 border-t border-border/60 flex gap-2 text-[13px] text-muted-foreground leading-relaxed">

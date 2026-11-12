@@ -2,7 +2,7 @@
 titulo: Documentação Técnica do Sistema
 subtitulo: Referência para desenvolvimento, implantação e manutenção do AlerGica — ambiente, configuração, dicionário de dados, APIs, serviços e componentes.
 categoria: Documentação Técnica
-versao: 1.7.0
+versao: 1.11.0
 atualizado: 12 de novembro de 2026
 publico: Desenvolvedores e equipe de operação
 classificacao: Confidencial
@@ -134,6 +134,7 @@ uvicorn app.main:app --reload    # http://localhost:8000  ·  documentação em 
 | `npm run test` | Executa os testes uma vez (Vitest) |
 | `npm run test:watch` | Testes em modo observação |
 | `npm run docs:pdf` | Gera os PDFs da documentação em `docs/pdf/` |
+| `npm run bulas:sync -- …` | Sincroniza PDFs de bula com o Storage (ver 7.5.4). Exige `SUPABASE_SERVICE_ROLE_KEY` no ambiente |
 | `node serve.mjs` | Serve `dist/` em `http://localhost:3000` (usado para capturas de tela) |
 
 ## 5. Configuração
@@ -192,7 +193,9 @@ CORS liberado para `http://localhost:8080` e `http://localhost:3000`. Para produ
 | `city` / `state` | text | Cidade e UF (opcionais) |
 | `profession` | text | Profissão (opcional) |
 | `phone` | text | Telefone |
-| `allergy_info` | text | Alergias (texto livre, pode vir da análise por IA no onboarding) |
+| `food_allergies` | text[] (padrão `{}`) | Alergias alimentares marcadas — ids de `lib/allergens.ts` (`leite`, `ovo`, `soja`, `gluten`, `amendoim`, `castanhas`, `peixe`, `crustaceos`, `gergelim`, `milho`). Índice GIN |
+| `drug_allergies` | text[] (padrão `{}`) | Classes de medicamento marcadas (`penicilinas`, `cefalosporinas`, `sulfas`, `aines`, `aas`, `dipirona`, `paracetamol`, `macrolideos`, `quinolonas`, `anticonvulsivantes`). Índice GIN |
+| `allergy_info` | text | Campo "Outros" (texto livre; também pode vir da IA no onboarding). Sem as colunas acima, guarda tudo como texto (reserva) |
 | `observation` | text | Observações de saúde |
 | `child_name` | text | Nome da criança (legado; substituído por `babies`) |
 | `avatar_url` | text | Foto (não usada na interface atual) |
@@ -253,8 +256,10 @@ RLS: o titular lê e insere os próprios registros; `admin` lê todos; não há 
 | `user_id` | uuid | Autor |
 | `content` | text | Mensagem. Pedidos de suporte vão para `suggestions` com o prefixo `[Suporte]` |
 | `created_at` | timestamptz | Data de envio |
+| `status` | text (padrão `novo`) | `novo`, `em_andamento` ou `resolvido` — definido pelo administrador |
+| `status_updated_at` | timestamptz | Última mudança de status |
 
-RLS: o autor insere e lê as próprias mensagens. A equipe lê pelo painel do Supabase.
+RLS: o autor insere e lê as próprias mensagens; `admin` lê todas e altera o status. A equipe acompanha pela página **Mensagens** (`/admin/mensagens`).
 
 #### `solicitado_inclusao` — pedidos de inclusão no catálogo
 
@@ -291,9 +296,26 @@ Tabela existente no banco, sem tela na versão atual.
 | `arquivo_url` | text | URL do PDF da bula original |
 | `data_extracao` | text | Data da análise da bula |
 | `access_count` | integer | Contador de visualizações (ordena "Mais Procurados") |
+| `bula_path` | text | Cópia da bula no Storage (`bulas/<id>/<sha256>.pdf`); o app prefere este campo a `arquivo_url` |
+| `bula_sha256` | text | Hash do PDF guardado — detecta mudança de conteúdo |
+| `bula_atualizada_em` / `bula_origem` | timestamptz / text | Quando e por onde a versão entrou (`admin`, `script`, `original`) |
+| `bula_reanalisar` | boolean (padrão `false`) | Bula trocada e análise ainda não conferida → o app mostra **Atenção** |
 | `created_at` / `updated_at` | timestamptz | Auditoria |
 
 RLS: leitura por qualquer usuário autenticado; escrita somente `admin`.
+
+#### `bula_versoes` — histórico de bulas
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | Identificador |
+| `medication_id` | uuid | Remédio |
+| `bula_path` / `bula_sha256` | text | Arquivo e hash da versão |
+| `origem` | text | `admin`, `script` ou `original` |
+| `enviado_por` | uuid | Administrador que enviou (nulo no script) |
+| `created_at` | timestamptz | Data |
+
+RLS: leitura só `admin`; gravação pelas funções abaixo ou pelo script (chave de serviço). **Storage:** bucket `bulas` público para leitura (bulas são documentos públicos), PDF até 20 MB; envio, troca e exclusão só `admin`.
 
 #### `products` e `restaurants` — módulos futuros
 
@@ -322,6 +344,9 @@ A migração `seed_medications` popula 5 grupos, 34 ingredientes e 25 medicament
 | Objeto | Tipo | Descrição |
 |---|---|---|
 | `has_role(_user_id uuid, _role app_role) → boolean` | Função `SECURITY DEFINER` | Verifica se o usuário tem o papel. Usada nas políticas e pelo frontend (`isAdmin`). |
+| `admin_list_messages() → table` | Função `SECURITY DEFINER` | Só `admin` (senão erro `42501`). Une `suggestions` e `feedback` (até 1000, mais recentes primeiro) com `kind` (`suporte` pelo prefixo `[Suporte]`, `sugestao`, `feedback`), conteúdo sem o prefixo, status, nome do perfil e e-mail de `auth.users`. `EXECUTE` só para `authenticated` |
+| `admin_set_bula(_med_id, _path, _sha256, _origem) → text` | Função `SECURITY DEFINER` | Só `admin`. Hash igual ao atual → `igual` (nada muda); senão grava a versão, registra em `bula_versoes` e liga `bula_reanalisar`. Retorna `primeira` ou `atualizada` |
+| `admin_mark_bula_analisada(_med_id) → void` | Função `SECURITY DEFINER` | Só `admin`. Desliga `bula_reanalisar` depois que a análise foi refeita/conferida (o fluxo de análise também pode gravar `false` diretamente) |
 | `increment_medication_access(med_id uuid) → void` | Função `SECURITY DEFINER` | Soma 1 em `access_count`. `EXECUTE` liberado para `authenticated`. |
 | `handle_new_user()` | Função de gatilho | Cria `profiles` (com `full_name` dos metadados) e `user_roles('user')` |
 | `on_auth_user_created` | Gatilho em `auth.users` | Executa `handle_new_user` após cada cadastro |
@@ -341,6 +366,17 @@ A migração `seed_medications` popula 5 grupos, 34 ingredientes e 25 medicament
 | `20260306000005_increment_medication_access_fn.sql` | Função de contador de acessos |
 | `20260308000000_add_profile_demographics.sql` | `birth_date`, `gender`, `city`, `state`, `profession` |
 | `20261112000000_lgpd_consents.sql` | `user_consents` (histórico de consentimentos) e políticas RLS |
+| `20261112000001_profile_allergy_lists.sql` | `food_allergies`, `drug_allergies` em `profiles` (+ índices GIN). Em produção: `supabase/manual/2026-11-12_alergias_por_tipo.sql` |
+| `20261112000002_admin_messages.sql` | `status`/`status_updated_at` em `suggestions` e `feedback`, políticas de leitura e atualização para `admin`, função `admin_list_messages`. Em produção: `supabase/manual/2026-11-12_mensagens_admin.sql` |
+| `20261112000003_bulas_storage.sql` | Colunas `bula_*` em `medications`, tabela `bula_versoes`, bucket `bulas` e políticas, funções `admin_set_bula` e `admin_mark_bula_analisada`. Em produção: `supabase/manual/2026-11-12_bulas_storage.sql` |
+
+### 6.5.1 Correção do banco em produção (12/11/2026)
+
+Verificado pela API: o banco em uso **não tinha** as colunas `phone`, `allergy_info`, `observation`, `birth_date`, `gender`, `city`, `state` e `profession` em `profiles`, a tabela `user_consents` nem a função `increment_medication_access`. Efeito: salvar o perfil falhava, os dados complementares do cadastro e as alergias do onboarding eram descartados sem aviso, e o contador de "Mais Procurados" não mudava.
+
+Correção: `supabase/manual/2026-11-12_corrigir_perfil_lgpd_contador.sql` — idempotente, só adiciona o que falta. Executar no **SQL Editor** do Supabase. **Não usar `supabase db push` neste banco**: as migrações antigas tentariam recriar `medications`, que em produção tem outro formato.
+
+Desde esta versão, o cadastro grava primeiro `full_name` e `profile_type` e depois os dados complementares, e os erros de gravação são registrados no console.
 
 ### 6.6 Como aplicar uma mudança de esquema
 
@@ -361,16 +397,16 @@ Regra do projeto: **componentes não chamam APIs diretamente** — usam as funç
 | `getPopularMedications()` | `MedRow[]` | 6 medicamentos com maior `access_count` |
 | `getMedicationsPage(page, pageSize = MEDS_PAGE_SIZE)` | `{ items: MedRow[], total }` | Uma página do catálogo em ordem alfabética (desempate por `id`), com total via `count: "exact"`. Usada no filtro "Todos" do módulo Remédios |
 | `getRecentMedications(limit = 10)` | `MedRow[]` | Lista em ordem alfabética (sem uso na interface atual) |
-| `getMedicationsByRisk(risk)` | `MedRow[]` | Lista completa de um nível; pré-filtra no banco em lotes de 1000 linhas (limite do PostgREST) e confirma com `medToRisk` |
+| `getMedicationsByRisk(risk, alergias, personalizado)` | `MedRow[]` | Lista completa de um nível para o perfil. Sem personalização: pré-filtra no banco por `tem_risco_aplv` em lotes de 1000 linhas. Com outras alergias: lê o catálogo inteiro (cache de 10 min) e filtra com `assessMedication` |
 | `searchMedications(q, limit = 12)` | `MedRow[]` | Busca `ILIKE` em `nome_principal`, `nome_alternativo` e `nome_completo`. O painel chama com `limit = 300`; o Início exibe os 12 primeiros |
 | `getMedication(id)` | `MedicationDetail` | Registro completo |
-| `getSafeAlternatives(med, limit = 6)` | `SafeAlternative[]` | Mesmos princípios ativos, sem leite, um por fabricante |
+| `getSafeAlternatives(med, limit = 6, alergias?)` | `SafeAlternative[]` | Mesmos princípios ativos, sem leite, um por fabricante; com `alergias`, só aceita as que `assessMedication` classifica como **Seguro** |
 | `recordMedicationView(id)` | `void` | Chama a RPC de contador; falhas são ignoradas |
-| `medToRisk(temRisco, nivel, avisos)` | `"safe" \| "caution" \| "risk"` | Regra de classificação (ver 7.2) |
+| `medToRisk(temRisco, nivel, avisos)` | `"safe" \| "caution" \| "risk"` | Classificação do catálogo **para leite** (= `catalogMilkRisk`, ver 7.2). Para o usuário use `assessMedication` |
 | `parseTextField(raw)` | `string[]` | Normaliza campos JSON/texto em lista de strings |
 | `activeKeysOf(med)` | `string[]` | Chaves canônicas de princípios ativos |
 
-Tipos e constantes exportados: `MedRow` (campos de listagem), `MedicationDetail` (registro completo), `SafeAlternative`, `MEDS_PAGE_SIZE` (30).
+Tipos e constantes exportados: `MedRow` (campos de listagem, inclui `composicao`), `MedicationDetail` (registro completo), `SafeAlternative`, `MEDS_PAGE_SIZE` (30).
 
 **Paginação do módulo Remédios.** Com o filtro "Todos" e sem busca, a paginação é feita no banco (`range`), buscando só os 30 itens da página. Nos filtros Seguro/Atenção/Risco a classificação final depende de `medToRisk` (que lê `avisos`), então a lista filtrada é carregada uma vez e paginada no navegador; trocar de página não faz nova consulta. Resultados de busca também são paginados no navegador. Trocar filtro ou busca volta para a página 1.
 
@@ -388,6 +424,17 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 | 6 | `tem_risco_aplv = false` | `safe` |
 | 7 | `nivel_alerta` contém "seguro" ou "liberado" | `safe` |
 | 8 | Nenhuma das anteriores | `caution` (padrão seguro) |
+
+### 7.2.1 Regra por usuário — `lib/medicationRisk.ts`
+
+`assessMedication(med, alergias)` devolve `level`, `hits` (alergias encontradas), `ambiguous` (ingredientes de origem não informada), `cross` (reação cruzada), `unverified` (alergias sem composição para verificar), `milkLevel`/`milkChecked`. O pior resultado vence:
+
+1. Leite no perfil (ou perfil vazio) → nível do catálogo (`catalogMilkRisk`).
+2. Alergia alimentar na `composicao`, ou alergia a medicamento/termo próprio no nome, `nome_completo` ou `composicao` → `risk`.
+3. Ingrediente ambíguo (`ambiguous` de cada grupo, com complementos que esclarecem a origem em `unless`), reação cruzada (`crossReactive`) ou composição ausente com alergias além de leite → `caution`.
+4. Nada encontrado → `safe`.
+
+`assessmentBadge(a, personalizado)` gera o texto do selo ("Seguro para o seu perfil", "Atenção (Verificar)", "Risco: leite e ovo"). Usado em `Dashboard` (listas e busca), `MedicationDetails` e `getSafeAlternatives`. Testes em `lib/medicationRisk.test.ts`.
 
 ### 7.3 Algoritmo de alternativas seguras
 
@@ -413,6 +460,7 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 | Função | Descrição |
 |---|---|
 | `getProfileSummary(userId)` | `full_name`, `profile_type` e `gender` do perfil, para o menu lateral |
+| `getAllergyInfo(userId)` | Texto livre `allergy_info` do perfil; usado pelo hook `useUserAllergies` (`hooks/use-user-allergies.ts`, React Query, chave `user-allergies`, invalidada ao salvar o perfil e no onboarding) |
 | `shortName(nome)` | Dois primeiros nomes, mantendo partículas entre eles e corrigindo maiúsculas ("CAROLINE LIMA MARQUES" → "Caroline Lima"; "Maria de Souza Santos" → "Maria de Souza") |
 | `initials(nome)` | Iniciais para o avatar, ignorando partículas |
 | `nameFromEmail(email)` | Nome provisório a partir do e-mail, quando não há nome cadastrado |
@@ -422,6 +470,23 @@ Avaliada na ordem abaixo; a primeira condição verdadeira decide.
 `lib/theme.ts`: `applySavedTheme`, `setDarkTheme`, `isDarkTheme` e `onThemeChange` (evento `alergica:theme`). Tema salvo em `localStorage("theme")` e aplicado pela classe `dark` no `<html>`.
 
 O menu usa o nome nesta ordem: `profiles.full_name` → `user_metadata.full_name` (cadastro) → e-mail.
+
+**`lib/allergens.ts` — catálogo de alergias:**
+
+| Função / constante | Descrição |
+|---|---|
+| `ALLERGEN_GROUPS` | Grupos com `kind` (alimento/medicamento), `featured` (aparece nas listas), `aliases` (o que o usuário escreve), `terms` (o que é procurado), `ambiguous` e `crossReactive`. Além dos 20 das listas: corantes, látex, opioides, tetraciclinas, anestésicos locais, iodo (só via "Outros") |
+| `FEATURED_FOOD` / `FEATURED_DRUG` | As 10 alimentares e as 10 classes de medicamentos das listas |
+| `parseAllergyInfo(texto)` | Reconhece o "Outros": separa por vírgula, ponto e vírgula, barra, quebra de linha, "e"/"ou"; item com apelido → grupo; demais → termo próprio |
+| `buildUserAllergies(sel)` | Junta listas marcadas e o reconhecido em "Outros" |
+| `selectionFromRow(linha)` | Linha de `profiles` → seleção. Perfis antigos (só texto) têm os itens das listas marcados automaticamente |
+| `selectionToText(sel)` | Texto de reserva quando o banco não tem as colunas novas (reconhecido de volta) |
+| `effectiveAllergies(a)` | Sem alergias → só leite (APLV) |
+| `findAllergens`, `findAmbiguous`, `foodOnly`, `joinLabels`, `shortLabel` | Busca em textos e auxiliares |
+
+`services/profile.ts`: `getAllergySelection(userId)` e `saveAllergySelection(userId, sel)` — grava `food_allergies`, `drug_allergies` e `allergy_info`; se o banco responder coluna inexistente (`42703`/`PGRST204`), grava tudo como texto em `allergy_info` e devolve `fallback: true`. Hook `useUserAllergies` (`hooks/use-user-allergies.ts`, React Query, chave `user-allergies`) entrega `selection`, `profile`, `effective`, `personalized` e `loading`; é invalidado ao salvar o perfil e no onboarding.
+
+Componentes: `AllergyPicker` (listas + "Outros" com reconhecimento ao vivo; itens reconhecidos no texto aparecem marcados com "reconhecido em Outros"), usado no cadastro e no perfil; `AllergySummary` (alergias por tipo, no quadro "Saúde"). Testes em `lib/allergens.test.ts`.
 
 ### 7.5.1 `services/privacy.ts` (LGPD)
 
@@ -439,8 +504,8 @@ Os dados do controlador, do encarregado e as versões dos documentos ficam em `s
 
 | Função / constante | Descrição |
 |---|---|
-| `analyzeLabel(blob, onProgress?)` | Tenta o n8n (se `VITE_N8N_WEBHOOK_URL` existir; tempo limite 30 s; exige `safe` booleano). Se não estiver configurado ou falhar, faz a leitura local. Lança erro só se as duas falharem |
-| `classifyLabelText(texto)` | Regras sobre o texto do rótulo: `contains` (termo lácteo fora de "pode conter"/"não contém"), `traces` (só em "pode conter", tolerando falhas de leitura como "pode conler") ou `inconclusive`. Ignora "zero/sem lactose" e palavras parecidas ("Deleite") |
+| `analyzeLabel(blob, alergias?, onProgress?)` | Tenta o n8n (envia também `allergies`, lista JSON com os nomes das alergias alimentares do perfil) (se `VITE_N8N_WEBHOOK_URL` existir; tempo limite 30 s; exige `safe` booleano). Se não estiver configurado ou falhar, faz a leitura local. Lança erro só se as duas falharem |
+| `classifyLabelText(texto, alergias?)` | Regras sobre o texto do rótulo para as alergias do perfil (padrão: leite). Retorna `hits` agrupados por alergia. `contains` (termo fora de "pode conter"/"não contém"), `traces` (só em "pode conter", tolerando falhas de leitura como "pode conler") ou `inconclusive`. Ignora "zero/sem lactose" e palavras parecidas ("Deleite") |
 | `MILK_TERMS` | leite, lactose, caseína, caseinato, lactoalbumina, lactoglobulina, soro de leite, whey, manteiga, creme de leite, queijo, requeijão, iogurte, lácteo(a)(s), gordura do leite, nata |
 | `MIN_CONFIDENCE` (70) | Leitura abaixo disso (ou com menos de 40 letras) vira "foto pouco nítida", exceto quando encontrou leite |
 | `estimateSkew(canvas)` | Descobre a inclinação do texto (-20° a +20°) por perfil de projeção numa miniatura de 500 px (~0,2 s) |
@@ -449,7 +514,7 @@ Os dados do controlador, do encarregado e as versões dos documentos ficam em `s
 
 **Leitura local:** `tesseract.js` (idioma `por`), importado sob demanda (chunk separado de ~19 KB). Na primeira vez o navegador baixa o motor (WebAssembly) e os dados do idioma pela CDN jsDelivr — alguns MB; nenhum dado do usuário é enviado. `vite.config.ts` inclui `tesseract.js` em `optimizeDeps` para evitar erro de importação dinâmica no modo de desenvolvimento (reinicie o `npm run dev` depois de instalar dependências).
 
-**Regra de segurança:** a leitura local nunca resulta em "seguro". Testes em `labelAnalysis.test.ts` (7 casos, incluindo texto real lido de rótulos).
+**Regra de segurança:** a leitura local nunca resulta em "seguro". Testes em `labelAnalysis.test.ts` (12 casos, incluindo texto real lido de rótulos e alergias a ovo, amendoim e termos próprios).
 
 **Teste com rótulos reais (12/11/2026, Chrome, versão com preparação da imagem):**
 
@@ -463,6 +528,40 @@ Os dados do controlador, do encarregado e as versões dos documentos ficam em `s
 | Tapioca | sem leite | inconclusivo (nunca "seguro") | 85% |
 
 1,3–2,4 s por foto; ~11 s na primeira análise (download do motor e do idioma).
+
+### 7.5.3 `services/adminMessages.ts` (administrador)
+
+| Função / tipo | Descrição |
+|---|---|
+| `listAdminMessages()` | Chama a RPC `admin_list_messages` |
+| `updateMessageStatus(msg, status)` | Atualiza `status` e `status_updated_at` na tabela de origem (`msg.source`) |
+| `AdminSetupMissingError` | Função/colunas inexistentes no banco (script ainda não aplicado) — a página mostra a instrução |
+| `AdminForbiddenError` | Usuário sem papel `admin` |
+| `KIND_LABELS`, `STATUS_LABELS` | Textos de tipo e situação |
+
+`AuthContext` expõe `roleLoading`, verdadeiro até o papel do usuário atual ser checado — evita redirecionar o administrador antes da resposta de `has_role`.
+
+**Tornar alguém administrador** (SQL Editor): `INSERT INTO public.user_roles (user_id, role) SELECT id, 'admin' FROM auth.users WHERE email = '…' ON CONFLICT DO NOTHING;`
+
+### 7.5.4 Bulas — `services/bulas.ts` e `scripts/sync-bulas.mjs`
+
+| Função | Descrição |
+|---|---|
+| `bulaPublicUrl(path)` | URL pública do PDF no bucket `bulas` |
+| `uploadBula(medId, file)` | Admin: confere se é PDF (`%PDF`, até 20 MB), calcula SHA-256 no navegador, envia `<id>/<sha>.pdf` e chama `admin_set_bula`. Retorna `primeira`, `atualizada` ou `igual` |
+| `markBulaAnalyzed(medId)` | Admin: chama `admin_mark_bula_analisada` |
+
+As listas leem `bula_reanalisar` junto com o catálogo; se a coluna ainda não existir no banco, `medications.ts` repete a consulta sem ela (`withListSelect`). `assessMedication` trata `bula_reanalisar = true` como **Atenção** (`bulaPending`).
+
+**Script em lote** (`npm run bulas:sync -- <opções>`, chave de serviço só no ambiente local, nunca no repositório):
+
+| Opção | Efeito |
+|---|---|
+| `--dir <pasta>` | Envia PDFs nomeados `<medication_id>.pdf`; versão diferente da guardada liga `bula_reanalisar` |
+| `--from-urls` | Para remédios sem cópia, baixa o `arquivo_url` (é a versão já analisada: não exige nova análise). Links expirados/bloqueados aparecem como falha |
+| `--dry-run`, `--limit n`, `--delay ms` | Simulação, limite de itens, pausa entre downloads (padrão 1500 ms) |
+
+Ex.: `SUPABASE_SERVICE_ROLE_KEY=… npm run bulas:sync -- --from-urls --dry-run`. O fluxo de análise (n8n) deve gravar `bula_reanalisar = false` ao concluir uma nova análise.
 
 ### 7.6 `services/studies.ts`
 
@@ -536,7 +635,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 
 | Componente | Responsabilidade |
 |---|---|
-| `Sidebar` | Barra lateral (desktop) e conteúdo do drawer (celular): logo, tema, cartão do usuário (dois primeiros nomes, iniciais e, para farmacêutico/médico, a profissão no feminino ou masculino conforme `gender`), menu Início / Meu Perfil / Configurações, Sair e links legais |
+| `Sidebar` | Barra lateral (desktop) e conteúdo do drawer (celular): logo, tema, cartão do usuário (dois primeiros nomes, iniciais e, para farmacêutico/médico, a profissão no feminino ou masculino conforme `gender`), menu Início / Meu Perfil / Configurações (para `admin`, também **Mensagens**, com o número de mensagens novas), Sair e links legais |
 | `ExpandableTabs` | Menu inferior fixo com os módulos Início, Remédios, Produtos, Restaurantes, Nutrição |
 | `MedicationCard` | Card de medicamento com nome, fabricante e selo de risco |
 | `RiskBadge` | Selo colorido do nível de risco |
@@ -547,6 +646,8 @@ Documentação interativa em `http://localhost:8000/docs`.
 | `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error`; foto pela câmera ou da galeria (imagem até 10 MB); no resultado, a foto fica ao lado do veredito e abre ampliada em um `Dialog` |
 | `BabyManager` | Lista, inclusão e remoção de bebês, com cálculo de idade |
 | `ChatWidget` | Botão flutuante do mascote: Suporte, Sugestão e Feedback |
+| `BulaViewer` | Diálogo com o PDF da bula guardada (`iframe`; no Android abre no leitor de PDF), com Baixar e Abrir em nova aba |
+| `AdminMessagesPage` | Página `/admin/mensagens`: contadores por situação (também filtram), abas por tipo, busca por texto/nome/e-mail, troca de situação com atualização otimista, copiar e-mail e responder (`mailto:`); atualiza a cada 60 s |
 | `ThemeToggle` | Botão de tema da barra lateral; usa `lib/theme.ts` e fica sincronizado com o seletor de Configurações |
 | `PageHeader` | Cabeçalho padrão das páginas internas: menu (celular), voltar, título `font-display` e subtítulo |
 | `NavLink` | Link de navegação com estado ativo |
@@ -654,3 +755,7 @@ O gerador (`scripts/build-docs.mjs`) monta capa, sumário e diagramas Mermaid e 
 | 1.5.0 | 12/11/2026 | `services/labelAnalysis.ts`: leitura local do rótulo com Tesseract.js como reserva do n8n, regras de leite testadas (seções 7.5.2 e 8.5). |
 | 1.6.0 | 12/11/2026 | Scanner: foto enviada ao lado do resultado, com visualização ampliada (seção 9). |
 | 1.7.0 | 12/11/2026 | Leitura local: preparação da imagem (cinza, contraste, endireitamento automático), duas leituras e tolerância a erros de letra; novos resultados de teste (seção 7.5.2). |
+| 1.8.0 | 12/11/2026 | Diagnóstico das colunas ausentes no banco em produção e script de correção (seção 6.5.1); cadastro grava perfil essencial e complementar separadamente. |
+| 1.9.0 | 12/11/2026 | Alergias por tipo: colunas `food_allergies`/`drug_allergies` e migração (6.2, 6.5); `lib/allergens.ts`, `lib/medicationRisk.ts` (regra única `assessMedication`), `getAllergySelection`/`saveAllergySelection`, `useUserAllergies`, `AllergyPicker`, `AllergySummary`; `getMedicationsByRisk`, `getSafeAlternatives`, `classifyLabelText`/`analyzeLabel` passam a usar as alergias do perfil (7.1, 7.2.1, 7.5, 7.5.2). |
+| 1.10.0 | 12/11/2026 | Página de mensagens do administrador: colunas de status e políticas em `suggestions`/`feedback`, função `admin_list_messages`, migração e script manual (6.2, 6.4, 6.5); `services/adminMessages.ts`, `roleLoading` (7.5.3); `AdminMessagesPage` e item no menu (9). |
+| 1.11.0 | 12/11/2026 | Bulas no Storage: colunas `bula_*`, `bula_versoes`, bucket e funções (6.3, 6.4, 6.5); `services/bulas.ts`, script `bulas:sync` (4.3, 7.5.4); `BulaViewer` (9); `bula_reanalisar` → Atenção. |

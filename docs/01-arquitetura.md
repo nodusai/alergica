@@ -2,7 +2,7 @@
 titulo: Arquitetura do Sistema
 subtitulo: Visão completa da arquitetura de software do AlerGica — componentes, dados, integrações, segurança, implantação e evolução.
 categoria: Documento de Arquitetura
-versao: 1.3.0
+versao: 1.8.0
 atualizado: 12 de novembro de 2026
 publico: Arquitetos, CTOs e due diligence técnica
 classificacao: Confidencial
@@ -175,6 +175,7 @@ flowchart TB
 | `/privacidade` | `PrivacyPolicyPage` | Público | Política de Privacidade |
 | `/termos` | `TermsPage` | Público | Termos de Uso |
 | `/redefinir-senha` | `ResetPasswordPage` | Link do e-mail | Criação de nova senha após "Esqueci minha senha" |
+| `/admin/mensagens` | `AdminMessagesPage` | Só `admin` | Caixa de Suporte, Sugestões e Feedback; quem não é administrador volta para `/dashboard` (o banco também bloqueia) |
 | `*` | `NotFound` | Público | Página 404 |
 
 \* A página não redireciona sozinha quem não está logado; os dados continuam protegidos pela RLS do banco (a consulta retorna vazio). Ver seção 13.
@@ -384,6 +385,44 @@ flowchart TD
 
 Na página de detalhe, a composição é dividida em **princípio ativo** e **excipientes**. Cada excipiente é comparado (sem acentos, sem diferenciar maiúsculas) com uma lista de termos lácteos — leite, lactose, caseína, caseinato, lactoalbumina, lactoglobulina, soro de leite, whey, manteiga, lactulose — somada aos termos que a análise da bula encontrou. Os que batem são destacados em vermelho.
 
+### 9.2.1 Alergias do perfil (multi-alérgeno)
+
+**Cadastro e perfil.** O usuário marca alergias em duas listas — **10 alimentares** (leite/APLV, ovo, soja, trigo/glúten, amendoim, castanhas e nozes, peixe, crustáceos, gergelim, milho) e **10 classes de medicamentos** (penicilinas, cefalosporinas, sulfas, anti-inflamatórios, AAS, dipirona, paracetamol, macrolídeos, quinolonas, anticonvulsivantes) — e escreve o que não estiver nelas em **Outros**. O texto de "Outros" é reconhecido por apelidos (ex.: "amoxicilina" → Penicilinas; "tartrazina" → Corantes; "tramadol" → Opioides); o que não é reconhecido vira **termo próprio**, procurado como escrito. Os ids marcados ficam em `profiles.food_allergies` / `drug_allergies` (`text[]`, índice GIN — permite consultar usuários por alergia) e o texto em `allergy_info`. Catálogo em `src/lib/allergens.ts`. Perfil sem alergias usa o padrão **APLV**.
+
+**Regra única de risco** (`src/lib/medicationRisk.ts`, `assessMedication`) — usada nas listas, na busca, no detalhe e nas alternativas, para que o selo da lista e a página do remédio sempre concordem. Princípio: *na dúvida, Atenção*.
+
+| Verificação | Fonte | Resultado |
+|---|---|---|
+| Leite (se estiver no perfil) | Catálogo: `tem_risco_aplv`, `nivel_alerta`, `avisos` | O do catálogo |
+| Alergia alimentar do perfil | Palavra inteira na `composicao` | Encontrou → **Risco** |
+| Alergia a medicamento / termo próprio | Nome + `nome_completo` + `composicao` | Encontrou → **Risco** |
+| Ingrediente de origem não informada (ex.: "lecitina" para ovo/soja, "amido" para glúten/milho, "gelatina" para peixe) | `composicao`, por ingrediente | **Atenção** |
+| Reação cruzada (penicilinas ↔ cefalosporinas; anti-inflamatórios ↔ AAS ↔ dipirona) | Nome + composição | **Atenção** |
+| Composição ausente com alergias além de leite | — | **Atenção** |
+| Bula trocada e análise ainda não conferida (`bula_reanalisar`) | Catálogo | **Atenção** (seção 9.2.2) |
+
+O pior resultado vence. **Seguro** só quando todas as alergias puderam ser verificadas e nada foi encontrado. Se o remédio tem leite mas leite não está no perfil, o detalhe mostra um aviso (sem pintar de vermelho). Enquanto as alergias do perfil carregam, nenhum veredito é exibido (listas mostram "Verificando…").
+
+**Listas filtradas.** Sem alergias personalizadas, o banco filtra por `tem_risco_aplv`. Com outras alergias, a classificação depende da composição: o catálogo é lido inteiro em lotes (cache de 10 min na sessão) e filtrado no navegador pela mesma regra.
+
+**Scanner de produtos.** Usa só as alergias alimentares e os termos próprios (sem alimentares, verifica leite) e envia a lista ao n8n no campo `allergies`.
+
+### 9.2.2 Bulas guardadas e atualização
+
+As bulas analisadas passam a ser guardadas pelo próprio AlerGica no **Supabase Storage** (bucket público `bulas`, só administradores gravam), em `<medication_id>/<sha256>.pdf`. O app abre a cópia guardada num visualizador interno (`BulaViewer`); `arquivo_url` fica como reserva e a busca no Bulário da Anvisa como conferência de versão mais nova.
+
+```mermaid
+flowchart LR
+  A["Novo PDF<br/>(admin na página do remédio<br/>ou scripts/sync-bulas.mjs)"] --> B{"SHA-256 igual<br/>ao guardado?"}
+  B -- sim --> C["Nada muda"]
+  B -- não --> D["Storage + bula_versoes<br/>bula_reanalisar = true"]
+  D --> E["App: remédio em Atenção<br/>'análise em revisão'"]
+  E --> F["Análise refeita/conferida<br/>admin_mark_bula_analisada"]
+  F --> G["Classificação normal"]
+```
+
+**Por que não é automático com a Anvisa:** a Anvisa não oferece API pública para baixar bulas, e a consulta do Bulário bloqueia acesso automatizado (testado em 12/11/2026). A estrutura acima aceita qualquer fonte autorizada: hoje, envio pelo administrador ou pelo script em lote; no futuro, uma fonte autorizada (API oficial com credenciais Gov.br ou serviço contratado) pode alimentar o mesmo fluxo por uma tarefa agendada, sem mudar o app. **Regra de segurança:** bula diferente da analisada nunca aparece como "Seguro" até a análise ser conferida.
+
 ### 9.3 Alternativas seguras
 
 Quando um medicamento é **Atenção** ou **Risco**, o sistema procura outros com **exatamente os mesmos princípios ativos** e sem leite.
@@ -449,10 +488,12 @@ sequenceDiagram
 |---|---|---|
 | `profiles`, `babies`, `user_onboarding` | Somente o dono | Somente o dono |
 | `user_consents` | O dono e `admin` | Inserção pelo dono (sem alteração ou exclusão) |
-| `suggestions`, `feedback` | Somente o dono | Inserção pelo dono |
+| `suggestions`, `feedback` | O dono e `admin` | Inserção pelo dono; `admin` altera o status |
 | `user_roles` | O próprio usuário | Somente `admin` |
 | `medications`, `ingredients`, `allergen_groups`, `medication_ingredients` | Qualquer usuário autenticado | Somente `admin` |
 | `news_cache` | Público | Somente `admin` (e Edge Function com chave de serviço) |
+
+A página de mensagens do administrador lê os dados pela função `admin_list_messages()` (`SECURITY DEFINER`, recusa quem não é `admin`), que junta as mensagens com **apenas** o nome (`profiles.full_name`) e o e-mail (`auth.users`) de quem enviou — o administrador não ganha acesso às alergias e observações do perfil (dados de saúde, LGPD).
 
 Papéis ficam em tabela separada (`user_roles`, enum `app_role`), e a checagem usa a função `has_role` com `SECURITY DEFINER`, o que evita recursão de políticas e impede que um usuário altere o próprio papel.
 
@@ -531,12 +572,13 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | Quando a análise de rótulo falhava, o scanner exibia um resultado de demonstração como se fosse real. | Alta | Falhas (rede, webhook ausente ou resposta sem veredito) levam a uma tela de erro com "Tentar novamente"; nenhum resultado é inventado. | 1.0.1 |
 | "Esqueci minha senha" não funcionava. | Média | Envio do link por e-mail (`resetPasswordForEmail`) e página `/redefinir-senha`. | 1.1.0 |
 | Estatísticas do perfil eram números fixos de exemplo. | Baixa | Bloco removido; o topo do perfil mostra dados reais (nome, tipo de perfil, data de cadastro e completude). | 1.2.0 |
+- **Classificação só para APLV nas listas:** listas, busca e detalhe agora usam a mesma regra por usuário (`assessMedication`), considerando todas as alergias do perfil.
 
 ### 13.2 Itens em aberto
 
 | # | Item | Severidade | Recomendação |
 |---|---|---|---|
-| 1 | As migrações não reproduzem o banco de produção: a tabela `medications` em produção usa colunas em português (`nome_principal`, `composicao`…), enquanto a migração cria colunas em inglês (`name`, `risk_level`…). `products`, `restaurants` e `solicitado_inclusao` não têm migração. | **Alta** | Gerar migração de base a partir do banco atual (`supabase db dump`) e regenerar `types.ts`. |
+| 1 | As migrações não reproduzem o banco de produção: a tabela `medications` em produção usa colunas em português (`nome_principal`, `composicao`…), enquanto a migração cria colunas em inglês (`name`, `risk_level`…). `products`, `restaurants` e `solicitado_inclusao` não têm migração. Em 12/11/2026 confirmou-se que o banco também não tinha as colunas extras de `profiles`, `user_consents` e `increment_medication_access` — corrigido pelo script `supabase/manual/2026-11-12_corrigir_perfil_lgpd_contador.sql`. | **Alta** | Gerar migração de base a partir do banco atual (`supabase db dump`) e regenerar `types.ts`. |
 | 2 | A API FastAPI consulta as colunas em inglês e não funcionaria com o banco atual; também não há middleware de validação de JWT (o `python-jose` está instalado, mas não é usado). | Média | Ajustar ao esquema real e adicionar validação do JWT antes de colocar em uso. |
 | 3 | A URL do webhook do n8n fica no código do navegador; qualquer pessoa pode chamá-la e consumir créditos de IA. | Média | Chamar o n8n a partir do servidor, com autenticação e limite de uso. |
 | 4 | A rota `/medication/:id` não redireciona usuário deslogado (os dados seguem protegidos pela RLS). | Baixa | Criar um componente de rota protegida reutilizável. |
@@ -544,6 +586,7 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | 6 | Cobertura de testes automatizados mínima (apenas um teste de exemplo). | Média | Testes unitários para `medToRisk`, `activeKeysOf` e `getSafeAlternatives`; testes E2E dos fluxos principais. |
 | 7 | O `README.md` descreve componentes e recursos de versões anteriores (ex.: importação JSON pelo admin). | Baixa | Apontar o README para esta documentação. |
 | 8 | "Suporte" no widget é gravado na tabela `suggestions` com o prefixo `[Suporte]`. | Baixa | Tabela ou canal próprio de atendimento. |
+| 9 | Links de bula da Anvisa (`arquivo_url`) expiram. **Em andamento:** bulas guardadas no Storage (seção 9.2.2); falta preencher as cópias (script `bulas:sync`) e definir uma fonte autorizada para atualização automática. | Média | Rodar `npm run bulas:sync -- --from-urls` / `--dir`; avaliar API oficial da Anvisa (Gov.br) ou serviço contratado para tarefa agendada. |
 
 ## 14. Histórico de revisões
 
@@ -554,3 +597,8 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | 1.1.0 | 12/11/2026 | Novas rotas (`/privacidade`, `/termos`, `/redefinir-senha`), Edge Function `delete-account`, tabela `user_consents` e seção 10.4 reescrita com as medidas de LGPD implementadas; recuperação de senha resolvida. |
 | 1.2.0 | 12/11/2026 | Estatísticas fictícias do perfil removidas (item resolvido na seção 13.1). |
 | 1.3.0 | 12/11/2026 | Leitura local de rótulos (Tesseract.js) como reserva do n8n no módulo Produtos (seção 7). |
+| 1.4.0 | 12/11/2026 | Item 1 da dívida técnica atualizado com as colunas ausentes no banco em produção e o script de correção. |
+| 1.5.0 | 12/11/2026 | Nova seção 9.2.1: listas de alergias (10 alimentares, 10 de medicamentos e "Outros") no cadastro e no perfil; colunas `food_allergies`/`drug_allergies`; regra única de risco por usuário (`assessMedication`) nas listas, detalhe, alternativas e scanner, com "Atenção" para ingredientes de origem duvidosa, reação cruzada e composição ausente. |
+| 1.6.0 | 12/11/2026 | Rota `/admin/mensagens` (caixa de Suporte, Sugestões e Feedback); `suggestions`/`feedback` com status e leitura por `admin`; função `admin_list_messages` (seções 5.2 e 10.2). |
+| 1.7.0 | 12/11/2026 | Item 9 da dívida técnica: links de bula da Anvisa expiram; paliativo com busca no Bulário. |
+| 1.8.0 | 12/11/2026 | Nova seção 9.2.2: bulas guardadas no Supabase Storage com versão (SHA-256), histórico, visualizador no app, atualização pelo administrador ou script e "Atenção" até a nova análise; item 9 da dívida técnica atualizado. |
