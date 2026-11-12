@@ -2,7 +2,7 @@
 titulo: Manual do Usuário
 subtitulo: Guia completo para usar o AlerGica no dia a dia — da criação da conta à consulta de medicamentos e produtos seguros para quem tem APLV.
 categoria: Manual do Usuário
-versao: 1.4.0
+versao: 1.6.0
 atualizado: 12 de novembro de 2026
 publico: Famílias, pessoas alérgicas e profissionais de saúde
 classificacao: Uso público
@@ -174,9 +174,17 @@ No menu inferior, toque em **Produtos**.
    - **Abrir câmera** — permita o acesso quando o navegador pedir, aponte para a **lista de ingredientes** dentro das marcações e toque no botão redondo branco. O botão com setas alterna entre câmera traseira e frontal; o **X** cancela.
    - **Enviar foto** — escolha uma foto que já está no aparelho (JPG ou PNG, até 10 MB). É o caminho mais prático no computador.
 2. Confira se a foto ficou nítida. Toque em **Tirar outra** (ou **Escolher outra**, se veio da galeria) ou em **Analisar ✨**.
-3. Aguarde a análise. O resultado mostra:
-   - **Produto Seguro ✓** (verde), ou
-   - **Atenção! Alérgenos Detectados** (vermelho), com a lista de alérgenos encontrados e uma explicação.
+3. Aguarde a análise. A foto é analisada pela IA do AlerGica; se ela estiver indisponível, o próprio aparelho lê o texto do rótulo (aparece "Lendo o rótulo... %") e a foto não é enviada a ninguém. O resultado pode ser:
+
+| Resultado | Cor | O que significa |
+|---|---|---|
+| **Produto seguro** | Verde | Só aparece na análise pela IA |
+| **Alérgenos detectados** / **Contém leite ou derivados** | Vermelho | Ingredientes de origem láctea encontrados — evite |
+| **Pode conter traços de leite** | Amarelo | O rótulo avisa "pode conter leite" — para APLV, o mais seguro é evitar |
+| **Não encontramos leite no texto lido** | Cinza | A leitura no aparelho não achou leite, mas **isso não garante que é seguro** — confira o rótulo |
+| **Foto pouco nítida** | Cinza | A leitura ficou ruim; tire outra foto |
+
+A foto enviada aparece ao lado do resultado (abaixo, no celular). Toque nela, ou em **Ampliar**, para ver em tamanho grande e conferir os ingredientes. Abaixo do resultado aparece se a análise foi feita pela IA ou no aparelho (com a qualidade da leitura). A leitura no aparelho nunca mostra "seguro": ela só confirma quando encontra leite.
 4. Toque em **Novo scan** para verificar outro produto ou em **Concluir**.
 
 Ao lado do botão, a tela mostra o passo a passo e dicas para uma boa leitura (boa iluminação, sem reflexos, letras nítidas).
@@ -310,3 +318,5 @@ Sim. Basta entrar com o mesmo e-mail e senha.
 | 1.2.0 | 12/11/2026 | Nova tela de login e cadastro; consentimentos LGPD; recuperação de senha; nova seção 16 "Privacidade e seus dados"; avisos sobre envio de dados à IA. |
 | 1.3.0 | 12/11/2026 | Novo menu lateral com nome do usuário, profissão (farmacêutico/médico) e atalho para Início. |
 | 1.4.0 | 12/11/2026 | Novas telas de Meu Perfil (resumo e quadro de saúde), Configurações (tema na página) e Produtos (enviar foto da galeria, passo a passo e dicas). |
+| 1.5.0 | 12/11/2026 | Leitura do rótulo no próprio aparelho quando a IA está indisponível; novos tipos de resultado (traços, inconclusivo, foto pouco nítida). |
+| 1.6.0 | 12/11/2026 | Foto enviada exibida ao lado do resultado, com opção de ampliar. |

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AlertTriangle, Info, ListChecks, Lock, Milk, ScanLine, Sparkles, Sun, Upload, ZoomIn } from "lucide-react";
 
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string;
+import { analyzeLabel, type ScanOutcome } from "@/services/labelAnalysis";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 // ─── ICONS ───────────────────────────────────────────────────────────────────
 const CameraIcon = () => (
@@ -54,19 +55,16 @@ const RetryIcon = () => (
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
 type Stage = "idle" | "camera" | "preview" | "analyzing" | "result" | "error";
 
-interface ScanResult {
-  safe: boolean;
-  product?: string;
-  allergens?: string[];
-  details?: string;
-}
+
 
 // -─── COMPONENTE ──────────────────────────────────────────────────────────────
 export default function ProductScanner() {
   const [stage, setStage] = useState<Stage>("idle");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [scanLine, setScanLine] = useState(0);
   // De onde veio a foto atual: define se "tirar outra" abre a câmera ou a galeria
@@ -152,27 +150,14 @@ export default function ProductScanner() {
   const analyzeImage = useCallback(async () => {
     if (!capturedImage) return;
     setStage("analyzing");
+    setProgress(null);
     try {
-      if (!N8N_WEBHOOK_URL) throw new Error("Webhook de análise não configurado");
-      const res = await fetch(capturedImage);
-      const blob = await res.blob();
-      const formData = new FormData();
-      formData.append("image", blob, "produto.jpg");
-
-      const response = await fetch(N8N_WEBHOOK_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Erro na análise");
-      const data = await response.json();
-      // Só exibe resultado se a resposta tiver o veredito; nunca inventa um resultado
-      if (typeof data?.safe !== "boolean") throw new Error("Resposta inválida da análise");
-      setResult(data as ScanResult);
+      const blob = await (await fetch(capturedImage)).blob();
+      setOutcome(await analyzeLabel(blob, setProgress));
       setStage("result");
     } catch (err) {
       console.error("Erro ao analisar produto:", err);
-      setResult(null);
+      setOutcome(null);
       setStage("error");
     }
   }, [capturedImage]);
@@ -205,7 +190,7 @@ export default function ProductScanner() {
   /** Nova foto pelo mesmo caminho usado antes (câmera ou galeria) */
   const retake = useCallback(() => {
     setCapturedImage(null);
-    setResult(null);
+    setOutcome(null);
     if (source === "gallery") {
       setStage("idle");
       fileInputRef.current?.click();
@@ -217,7 +202,7 @@ export default function ProductScanner() {
   const reset = useCallback(() => {
     stopCamera();
     setCapturedImage(null);
-    setResult(null);
+    setOutcome(null);
     setPermissionDenied(false);
     setUploadError(null);
     setStage("idle");
@@ -279,8 +264,8 @@ export default function ProductScanner() {
             <p className="mt-5 flex gap-2 text-[13px] text-muted-foreground leading-relaxed">
               <Lock className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                A foto vai para o nosso serviço de análise por IA só para ler os ingredientes. Evite fotografar pessoas ou
-                documentos.{" "}
+                A foto é analisada pela nossa IA ou, se ela estiver indisponível, lida no próprio aparelho — só para
+                encontrar os ingredientes. Evite fotografar pessoas ou documentos.{" "}
                 <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
                   Saiba mais
                 </a>
@@ -418,9 +403,13 @@ export default function ProductScanner() {
           </div>
           <div className="p-6 flex flex-col items-center gap-3">
             <div className="w-9 h-9 rounded-full border-[3px] border-secondary border-t-primary animate-spin" />
-            <p className="text-base font-bold text-foreground">Analisando ingredientes...</p>
+            <p className="text-base font-bold text-foreground">
+              {progress === null ? "Analisando ingredientes..." : `Lendo o rótulo... ${Math.round(progress * 100)}%`}
+            </p>
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
-              Verificando a composição do produto com as alergias cadastradas no perfil
+              {progress === null
+                ? "Procurando leite, derivados e avisos de traços na foto."
+                : "Leitura feita no seu aparelho — a foto não é enviada."}
             </p>
           </div>
         </div>
@@ -437,7 +426,7 @@ export default function ProductScanner() {
               Não foi possível analisar
             </h3>
             <p className="text-sm text-caution-foreground/90 leading-relaxed">
-              A análise do rótulo falhou e <strong>nenhum resultado foi gerado</strong>. Não considere este produto
+              Não conseguimos analisar a foto agora (verifique sua conexão) e <strong>nenhum resultado foi gerado</strong>. Não considere este produto
               seguro nem inseguro com base nesta tentativa. Tente novamente ou confira os ingredientes no rótulo.
             </p>
           </div>
@@ -460,60 +449,111 @@ export default function ProductScanner() {
       )}
 
       {/* ── RESULT ── */}
-      {stage === "result" && result && (
-        <div className="card-soft w-full max-w-sm p-6 flex flex-col gap-5">
-          {/* Badge principal */}
-          <div className={`rounded-2xl border p-6 flex flex-col items-center gap-3 ${
-            result.safe
-              ? "bg-safe/10 border-safe/40"
-              : "bg-risk/10 border-risk/40"
-          }`}>
-            <span className={result.safe ? "text-safe" : "text-risk"}>
-              {result.safe ? <CheckIcon /> : <AlertIcon />}
-            </span>
-            <h3 className={`text-lg font-bold tracking-tight text-center ${
-              result.safe ? "text-safe-foreground" : "text-risk-foreground"
-            }`}>
-              {result.safe ? "Produto Seguro ✓" : "Atenção! Alérgenos Detectados"}
-            </h3>
-            {result.product && (
-              <p className="text-sm text-muted-foreground italic">{result.product}</p>
-            )}
-          </div>
-
-          {/* Alérgenos encontrados */}
-          {!result.safe && result.allergens && result.allergens.length > 0 && (
-            <div className="bg-risk/5 border border-risk/20 rounded-xl p-4 flex flex-col gap-3">
-              <p className="text-xs font-semibold text-risk-foreground uppercase tracking-wide">
-                Alérgenos encontrados:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {result.allergens.map((a) => (
-                  <span key={a} className="bg-risk text-risk-foreground rounded-full px-3 py-1 text-xs font-semibold">
-                    {a}
+      {stage === "result" && outcome && (() => {
+        // Monta a apresentação conforme a origem da análise
+        type View = { tone: "safe" | "caution" | "risk" | "neutral"; title: string; text?: string; terms?: string[]; product?: string };
+        let view: View;
+        if (outcome.source === "ai") {
+          const r = outcome.result;
+          view = r.safe
+            ? { tone: "safe", title: "Produto seguro", text: r.details, product: r.product }
+            : { tone: "risk", title: "Alérgenos detectados", text: r.details, terms: r.allergens, product: r.product };
+        } else {
+          const r = outcome.result;
+          if (r.verdict === "contains")
+            view = { tone: "risk", title: "Contém leite ou derivados", terms: r.found, text: "Encontramos ingredientes de origem láctea no rótulo. Evite oferecer este produto." };
+          else if (r.verdict === "traces" && !r.lowQuality)
+            view = { tone: "caution", title: "Pode conter traços de leite", terms: r.found, text: "O rótulo avisa que o produto pode conter leite. Para quem tem APLV, o mais seguro é evitar." };
+          else if (r.verdict === "traces")
+            view = { tone: "caution", title: "Possível aviso de leite", terms: r.found, text: "Encontramos um possível aviso de traços de leite, mas a foto está pouco nítida. Confira no rótulo." };
+          else if (r.lowQuality)
+            view = { tone: "neutral", title: "Foto pouco nítida", text: "Não conseguimos ler o rótulo com segurança. Tire outra foto com boa luz, sem reflexos e com as letras em foco." };
+          else
+            view = { tone: "neutral", title: "Não encontramos leite no texto lido", text: "Isso não garante que o produto é seguro: a leitura automática pode falhar. Confira os ingredientes e os avisos de alergênicos no rótulo." };
+        }
+        const TONE = {
+          safe: { box: "bg-safe/10 border-safe/40", fg: "text-safe-foreground", icon: "text-safe", chip: "bg-safe/20" },
+          caution: { box: "bg-caution/10 border-caution/40", fg: "text-caution-foreground", icon: "text-caution", chip: "bg-caution/25" },
+          risk: { box: "bg-risk/10 border-risk/40", fg: "text-risk-foreground", icon: "text-risk", chip: "bg-risk/25" },
+          neutral: { box: "bg-secondary border-border", fg: "text-foreground", icon: "text-muted-foreground", chip: "bg-card" },
+        }[view.tone];
+        return (
+          <div className="w-full max-w-4xl grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 md:gap-6 items-start">
+            {/* Foto enviada */}
+            {capturedImage && (
+              <figure className="rounded-3xl bg-card border border-border/60 p-3 shadow-[0_1px_2px_hsl(var(--primary)/0.06),0_10px_28px_-14px_hsl(160_40%_15%/0.18)]">
+                <button
+                  type="button"
+                  onClick={() => setPhotoOpen(true)}
+                  aria-label="Ampliar a foto enviada"
+                  className="group relative block w-full overflow-hidden rounded-2xl bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <img
+                    src={capturedImage}
+                    alt="Foto do rótulo enviada para análise"
+                    className="w-full max-h-[420px] object-contain transition-transform duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:scale-[1.02] group-active:scale-[0.99]"
+                  />
+                  <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm opacity-90 group-hover:opacity-100 transition-opacity">
+                    <ZoomIn className="w-3.5 h-3.5" /> Ampliar
                   </span>
-                ))}
-              </div>
+                </button>
+                <figcaption className="px-1 pt-3 text-xs text-muted-foreground">
+                  Foto enviada · toque para ver em tamanho grande
+                </figcaption>
+              </figure>
+            )}
+
+          <div className="card-soft w-full p-6 flex flex-col gap-5">
+            <div className={`rounded-2xl border p-6 flex flex-col items-center gap-3 text-center ${TONE.box}`} role="status">
+              <span className={TONE.icon}>{view.tone === "safe" ? <CheckIcon /> : <AlertIcon />}</span>
+              <h3 className={`text-lg font-bold tracking-tight ${TONE.fg}`}>{view.title}</h3>
+              {view.product && <p className="text-sm text-muted-foreground italic">{view.product}</p>}
+              {view.terms && view.terms.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {view.terms.map((t) => (
+                    <span key={t} className={`rounded-full px-3 py-1 text-xs font-semibold ${TONE.chip} ${TONE.fg}`}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {view.text && <p className={`text-sm leading-relaxed ${TONE.fg} opacity-90`}>{view.text}</p>}
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center leading-relaxed">
+              {outcome.source === "ai"
+                ? "Análise feita pela nossa IA."
+                : `Análise feita no seu aparelho pela leitura do texto (qualidade da leitura: ${outcome.result.confidence}%).`}{" "}
+              Sempre confira o rótulo.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={retake}
+                className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <RetryIcon /> Novo scan
+              </button>
+              <button onClick={reset} className="flex-1 btn-primary flex items-center justify-center">
+                Concluir
+              </button>
+            </div>
+          </div>
+          </div>
+        );
+      })()}
+
+      {/* Foto em tamanho grande */}
+      <Dialog open={photoOpen && !!capturedImage} onOpenChange={setPhotoOpen}>
+        <DialogContent className="max-w-5xl w-[calc(100vw-2rem)] p-3 sm:p-4 rounded-3xl bg-card">
+          <DialogTitle className="px-1 text-base font-bold">Foto enviada</DialogTitle>
+          <DialogDescription className="sr-only">Imagem do rótulo usada na análise</DialogDescription>
+          {capturedImage && (
+            <div className="overflow-auto max-h-[80vh] rounded-2xl bg-black/5">
+              <img src={capturedImage} alt="Foto do rótulo em tamanho grande" className="w-full h-auto" />
             </div>
           )}
-
-          {result.details && (
-            <p className="text-sm text-muted-foreground leading-relaxed text-center">{result.details}</p>
-          )}
-
-          {/* Ações */}
-          <div className="flex gap-3">
-            <button
-              onClick={retake}
-              className="flex-1 flex items-center justify-center gap-2 bg-transparent text-muted-foreground border border-border rounded-2xl py-3 text-sm font-medium hover:border-primary/50 hover:text-foreground active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-              <RetryIcon /> Novo scan
-            </button>
-            <button onClick={reset} className="flex-1 btn-primary flex items-center justify-center">
-              Concluir
-            </button>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

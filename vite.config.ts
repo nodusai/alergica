@@ -22,6 +22,11 @@ export default defineConfig(() => ({
     },
   },
   plugins: [react()],
+  // tesseract.js é importado sob demanda (leitura de rótulos); pré-otimizar evita
+  // o erro "Failed to fetch dynamically imported module" na primeira análise em dev
+  optimizeDeps: {
+    include: ["tesseract.js"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

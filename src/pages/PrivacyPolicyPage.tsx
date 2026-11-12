@@ -129,7 +129,8 @@ const PrivacyPolicyPage = () => (
       </li>
       <li>
         <strong>n8n e provedor de inteligência artificial</strong> — recebem a foto do rótulo ou o texto que você enviar,
-        apenas para gerar a análise.
+        apenas para gerar a análise. Quando esse serviço está indisponível, a foto é lida no próprio aparelho e não é
+        enviada a ninguém.
       </li>
     </ul>
     <p>

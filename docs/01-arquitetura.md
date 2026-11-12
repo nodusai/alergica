@@ -2,7 +2,7 @@
 titulo: Arquitetura do Sistema
 subtitulo: Visão completa da arquitetura de software do AlerGica — componentes, dados, integrações, segurança, implantação e evolução.
 categoria: Documento de Arquitetura
-versao: 1.2.0
+versao: 1.3.0
 atualizado: 12 de novembro de 2026
 publico: Arquitetos, CTOs e due diligence técnica
 classificacao: Confidencial
@@ -241,7 +241,8 @@ Em desenvolvimento, o Vite encaminha `/api/*` para `http://localhost:8000`. **Na
 | Integração | Onde é usada | Protocolo | Autenticação | Comportamento em falha |
 |---|---|---|---|---|
 | **n8n — perfil de alergias** | Onboarding (`OnboardingModal`) | `POST` JSON `{ allergies }` | URL secreta do webhook (`VITE_N8N_WEBHOOK_URL`) | Mensagem de erro e opção de tentar de novo |
-| **n8n — leitura de rótulo** | Módulo Produtos (`ProductScanner`) | `POST` multipart com a foto (`image`) | Mesmo webhook | Tela de erro com "Tentar novamente"; nenhum resultado é exibido |
+| **n8n — leitura de rótulo** | Módulo Produtos (`ProductScanner`) | `POST` multipart com a foto (`image`) | Mesmo webhook | Leitura local do rótulo no aparelho (Tesseract.js); erro só se as duas falharem |
+| **Tesseract.js (leitura local)** | Reserva do scanner (`services/labelAnalysis.ts`) | Executa no navegador; baixa motor e idioma da CDN jsDelivr | Nenhuma | Tela de erro com "Tentar novamente" (ex.: sem internet na primeira vez) |
 | **Europe PMC** | Carrossel de estudos (`services/studies.ts`) | `GET` REST público | Nenhuma | Categoria com erro é ignorada; restante é exibido |
 | **MyMemory** | Tradução dos títulos dos estudos | `GET` REST público | Nenhuma | Mantém o título original em inglês (tempo limite de 4 s) |
 | **NewsAPI** | Edge Function e FastAPI `/news` | `GET` REST | Chave no servidor (`NEWS_API_KEY`) | Lista vazia |
@@ -552,3 +553,4 @@ Lista honesta do estado atual, para planejamento e due diligence. A severidade c
 | 1.0.1 | 12/11/2026 | Corrigidos os itens críticos de segurança (`create-admin-user`) e do scanner de produtos; nova seção 13.1 "Itens resolvidos". |
 | 1.1.0 | 12/11/2026 | Novas rotas (`/privacidade`, `/termos`, `/redefinir-senha`), Edge Function `delete-account`, tabela `user_consents` e seção 10.4 reescrita com as medidas de LGPD implementadas; recuperação de senha resolvida. |
 | 1.2.0 | 12/11/2026 | Estatísticas fictícias do perfil removidas (item resolvido na seção 13.1). |
+| 1.3.0 | 12/11/2026 | Leitura local de rótulos (Tesseract.js) como reserva do n8n no módulo Produtos (seção 7). |

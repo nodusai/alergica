@@ -2,7 +2,7 @@
 titulo: Documentação Técnica do Sistema
 subtitulo: Referência para desenvolvimento, implantação e manutenção do AlerGica — ambiente, configuração, dicionário de dados, APIs, serviços e componentes.
 categoria: Documentação Técnica
-versao: 1.4.0
+versao: 1.7.0
 atualizado: 12 de novembro de 2026
 publico: Desenvolvedores e equipe de operação
 classificacao: Confidencial
@@ -435,6 +435,35 @@ O menu usa o nome nesta ordem: `profiles.full_name` → `user_metadata.full_name
 
 Os dados do controlador, do encarregado e as versões dos documentos ficam em `src/config/legal.ts` (`LEGAL`). **Preencha os campos entre colchetes antes de publicar** e aumente a versão sempre que mudar o texto da Política ou dos Termos.
 
+### 7.5.2 `services/labelAnalysis.ts` (módulo Produtos)
+
+| Função / constante | Descrição |
+|---|---|
+| `analyzeLabel(blob, onProgress?)` | Tenta o n8n (se `VITE_N8N_WEBHOOK_URL` existir; tempo limite 30 s; exige `safe` booleano). Se não estiver configurado ou falhar, faz a leitura local. Lança erro só se as duas falharem |
+| `classifyLabelText(texto)` | Regras sobre o texto do rótulo: `contains` (termo lácteo fora de "pode conter"/"não contém"), `traces` (só em "pode conter", tolerando falhas de leitura como "pode conler") ou `inconclusive`. Ignora "zero/sem lactose" e palavras parecidas ("Deleite") |
+| `MILK_TERMS` | leite, lactose, caseína, caseinato, lactoalbumina, lactoglobulina, soro de leite, whey, manteiga, creme de leite, queijo, requeijão, iogurte, lácteo(a)(s), gordura do leite, nata |
+| `MIN_CONFIDENCE` (70) | Leitura abaixo disso (ou com menos de 40 letras) vira "foto pouco nítida", exceto quando encontrou leite |
+| `estimateSkew(canvas)` | Descobre a inclinação do texto (-20° a +20°) por perfil de projeção numa miniatura de 500 px (~0,2 s) |
+
+**Preparação da imagem (canvas):** lado maior padronizado em 2000 px → tons de cinza com contraste esticado (ignora 1% dos extremos) → texto endireitado pelo ângulo estimado. Leitura em modo bloco único (PSM 6) e, se não encontrar leite, segunda leitura automática (PSM 3), ficando com a melhor. **Tolerância a erros de leitura:** termos de uma palavra com 5+ letras aceitam 1 letra trocada (`le1te`, `lelte`, `lactcse`), após corrigir confusões comuns (1→l, 0→o, 3→e, 5→s); o erro, quando houver, vai para o lado seguro (indicar leite).
+
+**Leitura local:** `tesseract.js` (idioma `por`), importado sob demanda (chunk separado de ~19 KB). Na primeira vez o navegador baixa o motor (WebAssembly) e os dados do idioma pela CDN jsDelivr — alguns MB; nenhum dado do usuário é enviado. `vite.config.ts` inclui `tesseract.js` em `optimizeDeps` para evitar erro de importação dinâmica no modo de desenvolvimento (reinicie o `npm run dev` depois de instalar dependências).
+
+**Regra de segurança:** a leitura local nunca resulta em "seguro". Testes em `labelAnalysis.test.ts` (7 casos, incluindo texto real lido de rótulos).
+
+**Teste com rótulos reais (12/11/2026, Chrome, versão com preparação da imagem):**
+
+| Foto | Rótulo diz | Resultado | Leitura |
+|---|---|---|---|
+| Barra de cereal (foto inclinada ~10°, amarelo/marrom) | leite em pó, contém lactose | contém (leite, lactose) | 85% (antes: 40%, nada encontrado) |
+| Nescau | soro de leite | contém | 80% |
+| Pão Panco | pode conter leite | contém (exagera, lado seguro) | 71% |
+| Toddy (foto pequena e borrada) | pode conter leite | contém (exagera, lado seguro) | 58% |
+| Pão Pullman | pode conter leite (o texto do Open Food Facts omitia) | pode conter traços | 89% |
+| Tapioca | sem leite | inconclusivo (nunca "seguro") | 85% |
+
+1,3–2,4 s por foto; ~11 s na primeira análise (download do motor e do idioma).
+
 ### 7.6 `services/studies.ts`
 
 | Item | Detalhe |
@@ -501,7 +530,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 | Uso | Requisição | Resposta esperada |
 |---|---|---|
 | Onboarding — perfil de alergias | `POST` JSON `{ "allergies": "<texto livre>" }` | Texto com o perfil gerado (qualquer campo de texto retornado é aceito) |
-| Scanner de produtos | `POST` multipart, campo `image` (JPEG) | `{ safe: boolean, product?: string, allergens?: string[], details?: string }`. Se `safe` não vier como booleano, ou a chamada falhar, o app mostra a tela de erro — nunca um resultado padrão. |
+| Scanner de produtos | `POST` multipart, campo `image` (JPEG) | `{ safe: boolean, product?: string, allergens?: string[], details?: string }`. Se `safe` não vier como booleano, ou a chamada falhar, o app usa a leitura local (seção 7.5.2) — nunca um resultado padrão. |
 
 ## 9. Componentes de interface
 
@@ -515,7 +544,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 | `APLVInfoCarousel` | Carrossel com 10 fichas educativas com fonte e estudos recentes traduzidos |
 | `OnboardingModal` | Boas-vindas e configuração do perfil de alergias com IA (pulada para profissionais de saúde) |
 | `LegalLayout` | Layout das páginas públicas de Política de Privacidade e Termos de Uso |
-| `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error`; foto pela câmera ou da galeria (imagem até 10 MB) |
+| `ProductScanner` | Câmera, captura, envio ao n8n e exibição do resultado; estados `idle`, `camera`, `preview`, `analyzing`, `result` ou `error`; foto pela câmera ou da galeria (imagem até 10 MB); no resultado, a foto fica ao lado do veredito e abre ampliada em um `Dialog` |
 | `BabyManager` | Lista, inclusão e remoção de bebês, com cálculo de idade |
 | `ChatWidget` | Botão flutuante do mascote: Suporte, Sugestão e Feedback |
 | `ThemeToggle` | Botão de tema da barra lateral; usa `lib/theme.ts` e fica sincronizado com o seletor de Configurações |
@@ -622,3 +651,6 @@ O gerador (`scripts/build-docs.mjs`) monta capa, sumário e diagramas Mermaid e 
 | 1.2.0 | 12/11/2026 | LGPD: tabela `user_consents`, Edge Function `delete-account`, `services/privacy.ts`, `services/auth.ts`, `config/legal.ts`; campos opcionais no perfil; fonte `font-display` (seções 6, 7, 8, 9 e 10). |
 | 1.3.0 | 12/11/2026 | Menu lateral redesenhado: `services/profile.ts`, `lib/names.ts` e testes (seções 7.5, 9 e 11). |
 | 1.4.0 | 12/11/2026 | `PageHeader`, `lib/theme.ts`, `displayName`/`firstName`; perfil sem estatísticas fictícias; scanner aceita foto da galeria (seções 7.5 e 9). |
+| 1.5.0 | 12/11/2026 | `services/labelAnalysis.ts`: leitura local do rótulo com Tesseract.js como reserva do n8n, regras de leite testadas (seções 7.5.2 e 8.5). |
+| 1.6.0 | 12/11/2026 | Scanner: foto enviada ao lado do resultado, com visualização ampliada (seção 9). |
+| 1.7.0 | 12/11/2026 | Leitura local: preparação da imagem (cinza, contraste, endireitamento automático), duas leituras e tolerância a erros de letra; novos resultados de teste (seção 7.5.2). |
